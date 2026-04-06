@@ -12,7 +12,7 @@
 
 ## Bugs connus
 - [ ] CPU% processus = 0% sur Windows (psutil trop lent)
-- [ ] favicon.ico 404
+- [x] favicon.ico 404
 - [ ] deploy.sh : Pi peut reporter FAIL si demarrage >5s
 - [ ] IP Windows (172.23.80.1) peut changer au reboot WSL
 

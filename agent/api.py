@@ -749,13 +749,21 @@ async def run_terminal_command(body: TerminalCommand):
 @router.post("/api/update/check")
 async def update_check():
     if IS_WINDOWS:
+        # Use PowerShell to check for pending Windows updates + installed hotfixes
         result = await _async_run_powershell(
-            "winget upgrade --include-unknown", timeout=120
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+            "Write-Output '=== Installed Updates (recent) ==='; "
+            "Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 10 Description, HotFixID, InstalledOn | Format-Table -AutoSize; "
+            "Write-Output ''; "
+            "Write-Output '=== Winget upgradable packages ==='; "
+            "try { $r = winget upgrade --include-unknown --disable-interactivity 2>&1 | Out-String; Write-Output $r.Substring(0, [Math]::Min($r.Length, 2000)) } "
+            "catch { Write-Output 'winget not available or timed out' }",
+            timeout=90
         )
     else:
         # Try sudo first, fall back to apt list --upgradable if sudo fails
         result = await _async_run("sudo -n apt update 2>&1", timeout=60)
-        if result["returncode"] != 0 and "password" in result["stderr"].lower():
+        if result["returncode"] != 0 and "password" in (result["stdout"] + result["stderr"]).lower():
             # No sudo access — use non-privileged check
             result = await _async_run("apt list --upgradable 2>/dev/null", timeout=30)
 
@@ -769,12 +777,13 @@ async def update_check():
 async def update_upgrade():
     if IS_WINDOWS:
         result = await _async_run_powershell(
-            "winget upgrade --all --accept-source-agreements --accept-package-agreements",
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+            "winget upgrade --all --accept-source-agreements --accept-package-agreements --disable-interactivity 2>&1 | Out-String",
             timeout=600,
         )
     else:
         result = await _async_run("sudo -n apt upgrade -y 2>&1", timeout=600)
-        if result["returncode"] != 0 and "password" in result["stderr"].lower():
+        if result["returncode"] != 0 and "password" in (result["stdout"] + result["stderr"]).lower():
             return {
                 "output": "sudo requires a password. Configure passwordless sudo for apt or run the agent as root.",
                 "success": False,

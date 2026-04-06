@@ -103,6 +103,10 @@
     }
   }
 
+  function getMachine(id) {
+    return machines.find(function (m) { return m.id === id; });
+  }
+
   function selectedMachine() {
     return machines.find(function (m) { return m.id === selectedMachineId; });
   }

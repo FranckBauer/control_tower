@@ -185,9 +185,15 @@
      --------------------------------------------------------------- */
   function showSection(name) {
     currentSection = name;
-    $$(".section").forEach(function (s) { s.classList.remove("active"); });
+    $$(".section").forEach(function (s) {
+      s.classList.remove("active");
+      s.classList.add("hidden");
+    });
     var sec = $("#section-" + name);
-    if (sec) sec.classList.add("active");
+    if (sec) {
+      sec.classList.remove("hidden");
+      sec.classList.add("active");
+    }
 
     $$(".nav-link").forEach(function (l) {
       l.classList.toggle("active", l.dataset.section === name);
@@ -1036,6 +1042,9 @@
 
     // Update service dropdown with known services
     updateLogServiceOptions();
+
+    // Auto-load logs
+    setTimeout(refreshLogs, 200);
   }
 
   function updateLogServiceOptions() {

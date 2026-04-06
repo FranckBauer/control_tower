@@ -1,34 +1,57 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pi Dashboard</title>
+  <title>Control Tower</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <header>
     <div class="header-left">
-      <button class="hamburger" id="hamburger" aria-label="Menu">&#9776;</button>
-      <span class="logo">&#127827;</span>
-      <h1>Pi Dashboard</h1>
+      <button class="hamburger" id="hamburger" aria-label="Toggle sidebar">&#9776;</button>
+      <span class="logo">&#128752;</span>
+      <h1>Control Tower</h1>
     </div>
     <div class="header-right">
-      <span id="current-machine-name">All machines</span>
-      <button id="btn-manage-machines" class="btn-icon" title="Manage machines">&#9881;</button>
+      <span class="header-machine-label" id="current-machine-name">All machines</span>
+      <button id="btn-manage-machines" class="btn-icon" title="Manage machines">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
     </div>
   </header>
 
   <div class="layout">
     <nav id="sidebar">
-      <a href="#" class="nav-link active" data-section="monitoring">&#9881; Monitoring</a>
-      <a href="#" class="nav-link" data-section="services">&#9881; Services</a>
-      <a href="#" class="nav-link" data-section="network">&#127760; Network</a>
-      <a href="#" class="nav-link" data-section="files">&#128193; Files</a>
-      <a href="#" class="nav-link" data-section="terminal">&#128187; Terminal</a>
-      <a href="#" class="nav-link" data-section="updates">&#128259; Updates</a>
-      <a href="#" class="nav-link" data-section="logs">&#128220; Logs</a>
+      <a href="#" class="nav-link active" data-section="monitoring">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span>Monitoring</span>
+      </a>
+      <a href="#" class="nav-link" data-section="services">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span>Services</span>
+      </a>
+      <a href="#" class="nav-link" data-section="network">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+        <span>Network</span>
+      </a>
+      <a href="#" class="nav-link" data-section="files">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        <span>Files</span>
+      </a>
+      <a href="#" class="nav-link" data-section="terminal">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <span>Terminal</span>
+      </a>
+      <a href="#" class="nav-link" data-section="updates">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Updates</span>
+      </a>
+      <a href="#" class="nav-link" data-section="logs">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>Logs</span>
+      </a>
     </nav>
 
     <main>
@@ -36,109 +59,146 @@
       <div class="machine-bar" id="machine-selector"></div>
 
       <!-- MONITORING -->
-      <div class="section" id="section-monitoring">
-        <h2>Monitoring</h2>
-        <div id="monitoring-content">
-          <div class="loading-indicator">Loading...</div>
+      <section class="section" id="section-monitoring">
+        <div class="section-header">
+          <h2>Monitoring</h2>
+          <span class="section-badge" id="monitoring-machine-count"></span>
         </div>
-      </div>
+        <div id="monitoring-content">
+          <div class="loading-indicator">Loading machines...</div>
+        </div>
+      </section>
 
       <!-- SERVICES -->
-      <div class="section hidden" id="section-services">
-        <h2>Services</h2>
-        <div class="select-machine-msg hidden" id="services-select-msg">Select a machine to view services.</div>
-        <div class="card" id="services-card">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Enabled</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="services-body"></tbody>
-          </table>
+      <section class="section hidden" id="section-services">
+        <div class="section-header">
+          <h2>Services</h2>
         </div>
-      </div>
+        <div class="select-machine-msg" id="services-select-msg">Select a machine to view services.</div>
+        <div class="card" id="services-card" style="display:none">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Status</th>
+                  <th>Startup</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="services-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       <!-- NETWORK -->
-      <div class="section hidden" id="section-network">
-        <h2>Network</h2>
-        <div id="network-cards"></div>
-      </div>
+      <section class="section hidden" id="section-network">
+        <div class="section-header">
+          <h2>Network</h2>
+        </div>
+        <div class="select-machine-msg" id="network-select-msg">Select a machine to view network info.</div>
+        <div id="network-content" style="display:none">
+          <div class="stat-row" id="network-stats"></div>
+          <div class="subsection-title">Interfaces</div>
+          <div id="network-interfaces"></div>
+          <div class="subsection-title">Traffic</div>
+          <div class="card" id="network-traffic"></div>
+        </div>
+      </section>
 
       <!-- FILES -->
-      <div class="section hidden" id="section-files">
-        <h2>Files</h2>
-        <div class="select-machine-msg hidden" id="files-select-msg">Select a machine to browse files.</div>
-        <div id="drives-bar" class="drives-bar hidden"></div>
-        <div class="card" id="files-card">
-          <div class="files-toolbar">
-            <div class="breadcrumbs" id="breadcrumbs"></div>
-            <button class="btn btn-sm" id="btn-transfer">Transfer</button>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Size</th>
-                <th>Modified</th>
-              </tr>
-            </thead>
-            <tbody id="files-body"></tbody>
-          </table>
+      <section class="section hidden" id="section-files">
+        <div class="section-header">
+          <h2>Files</h2>
         </div>
-      </div>
+        <div class="select-machine-msg" id="files-select-msg">Select a machine to browse files.</div>
+        <div id="files-content" style="display:none">
+          <div id="drives-bar" class="drives-bar"></div>
+          <div class="card">
+            <div class="files-toolbar">
+              <div class="breadcrumbs" id="breadcrumbs"></div>
+              <div class="files-actions">
+                <button class="btn btn-sm" id="btn-upload">Upload</button>
+                <button class="btn btn-sm" id="btn-transfer">Transfer</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th class="col-size">Size</th>
+                    <th class="col-modified">Modified</th>
+                  </tr>
+                </thead>
+                <tbody id="files-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- TERMINAL -->
-      <div class="section hidden" id="section-terminal">
-        <h2>Terminal</h2>
-        <div class="select-machine-msg hidden" id="terminal-select-msg">Select a machine to use the terminal.</div>
-        <div class="terminal-warning hidden" id="terminal-warning">&#9888; Warning: commands execute directly on the remote machine.</div>
-        <div class="card terminal-card" id="terminal-card">
-          <div class="terminal-output" id="terminal-output"></div>
-          <div class="terminal-input-row">
-            <span class="terminal-prompt" id="terminal-prompt">$</span>
-            <input type="text" id="terminal-input" placeholder="Enter command..." autocomplete="off" spellcheck="false">
+      <section class="section hidden" id="section-terminal">
+        <div class="section-header">
+          <h2>Terminal</h2>
+        </div>
+        <div class="select-machine-msg" id="terminal-select-msg">Select a machine to use the terminal.</div>
+        <div id="terminal-content" style="display:none">
+          <div class="terminal-warning" id="terminal-warning">Commands execute directly on the remote machine. Some dangerous commands are blocked.</div>
+          <div class="terminal-card" id="terminal-card">
+            <div class="terminal-output" id="terminal-output"></div>
+            <div class="terminal-input-row">
+              <span class="terminal-prompt" id="terminal-prompt">$</span>
+              <input type="text" id="terminal-input" placeholder="Enter command..." autocomplete="off" spellcheck="false">
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- UPDATES -->
-      <div class="section hidden" id="section-updates">
-        <h2>Updates</h2>
-        <div class="select-machine-msg hidden" id="updates-select-msg">Select a machine to manage updates.</div>
-        <div class="card" id="updates-card">
-          <div class="updates-actions">
-            <button id="btn-check-updates" class="btn btn-primary">Check updates</button>
-            <button id="btn-install-updates" class="btn btn-outline">Install updates</button>
-            <span class="spinner hidden" id="updates-spinner"></span>
-          </div>
-          <pre class="updates-output" id="updates-output"></pre>
+      <section class="section hidden" id="section-updates">
+        <div class="section-header">
+          <h2>Updates</h2>
         </div>
-      </div>
+        <div class="select-machine-msg" id="updates-select-msg">Select a machine to manage updates.</div>
+        <div id="updates-content" style="display:none">
+          <div class="card">
+            <div class="updates-actions">
+              <button id="btn-check-updates" class="btn btn-primary">Check for Updates</button>
+              <button id="btn-install-updates" class="btn btn-danger">Install Updates</button>
+              <span class="spinner hidden" id="updates-spinner"></span>
+            </div>
+            <pre class="code-output" id="updates-output">No update check performed yet.</pre>
+          </div>
+        </div>
+      </section>
 
       <!-- LOGS -->
-      <div class="section hidden" id="section-logs">
-        <h2>Logs</h2>
-        <div class="select-machine-msg hidden" id="logs-select-msg">Select a machine to view logs.</div>
-        <div class="card" id="logs-card">
-          <div class="logs-toolbar">
-            <select id="logs-service">
-              <option value="system">system</option>
-            </select>
-            <select id="logs-lines">
-              <option value="50">50 lines</option>
-              <option value="100" selected>100 lines</option>
-              <option value="200">200 lines</option>
-              <option value="500">500 lines</option>
-            </select>
-            <button id="btn-refresh-logs" class="btn btn-primary">Refresh</button>
-          </div>
-          <pre class="logs-output" id="logs-output"></pre>
+      <section class="section hidden" id="section-logs">
+        <div class="section-header">
+          <h2>Logs</h2>
         </div>
-      </div>
+        <div class="select-machine-msg" id="logs-select-msg">Select a machine to view logs.</div>
+        <div id="logs-content" style="display:none">
+          <div class="card">
+            <div class="logs-toolbar">
+              <select id="logs-service" class="form-select">
+                <option value="system">system</option>
+              </select>
+              <select id="logs-lines" class="form-select">
+                <option value="50">50 lines</option>
+                <option value="100" selected>100 lines</option>
+                <option value="200">200 lines</option>
+                <option value="500">500 lines</option>
+              </select>
+              <button id="btn-refresh-logs" class="btn btn-primary">Refresh</button>
+            </div>
+            <pre class="code-output" id="logs-output">Select a service and click Refresh.</pre>
+          </div>
+        </div>
+      </section>
 
     </main>
   </div>
@@ -151,8 +211,8 @@
         <button class="modal-close" id="machines-modal-close">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="machines-list" id="machines-list"></div>
-        <button class="btn btn-primary" id="btn-add-machine" style="margin-top: 16px;">+ Add Machine</button>
+        <div id="machines-list"></div>
+        <button class="btn btn-primary" id="btn-add-machine" style="margin-top:16px">+ Add Machine</button>
       </div>
     </div>
   </div>
@@ -165,34 +225,13 @@
         <button class="modal-close" id="add-machine-close">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label" for="add-machine-id">ID</label>
-          <input type="text" class="form-input" id="add-machine-id" placeholder="my-machine">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="add-machine-name">Name</label>
-          <input type="text" class="form-input" id="add-machine-name" placeholder="My Raspberry Pi">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="add-machine-desc">Description</label>
-          <input type="text" class="form-input" id="add-machine-desc" placeholder="Living room Pi">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="add-machine-ip">IP Address</label>
-          <input type="text" class="form-input" id="add-machine-ip" placeholder="192.168.1.100">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="add-machine-port">Port</label>
-          <input type="number" class="form-input" id="add-machine-port" value="3001" placeholder="3001">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="add-machine-icon">Icon</label>
-          <input type="text" class="form-input" id="add-machine-icon" placeholder="&#127827;" maxlength="4">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="add-machine-path">Default Path</label>
-          <input type="text" class="form-input" id="add-machine-path" placeholder="/">
-        </div>
+        <div class="form-group"><label class="form-label" for="add-machine-id">ID</label><input type="text" class="form-input" id="add-machine-id" placeholder="my-machine"></div>
+        <div class="form-group"><label class="form-label" for="add-machine-name">Name</label><input type="text" class="form-input" id="add-machine-name" placeholder="My Raspberry Pi"></div>
+        <div class="form-group"><label class="form-label" for="add-machine-desc">Description</label><input type="text" class="form-input" id="add-machine-desc" placeholder="Living room Pi"></div>
+        <div class="form-group"><label class="form-label" for="add-machine-ip">IP Address</label><input type="text" class="form-input" id="add-machine-ip" placeholder="192.168.1.100"></div>
+        <div class="form-group"><label class="form-label" for="add-machine-port">Port</label><input type="number" class="form-input" id="add-machine-port" value="3001"></div>
+        <div class="form-group"><label class="form-label" for="add-machine-icon">Icon</label><input type="text" class="form-input" id="add-machine-icon" placeholder="&#127827;" maxlength="4"></div>
+        <div class="form-group"><label class="form-label" for="add-machine-path">Default Path</label><input type="text" class="form-input" id="add-machine-path" placeholder="/"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="add-machine-submit">Add</button>
@@ -224,18 +263,9 @@
         <button class="modal-close" id="transfer-close">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Source file</label>
-          <input type="text" class="form-input" id="transfer-source" readonly>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Destination machine</label>
-          <select class="form-input" id="transfer-dest-machine"></select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Destination path</label>
-          <input type="text" class="form-input" id="transfer-dest-path" placeholder="/home/pi/file.txt">
-        </div>
+        <div class="form-group"><label class="form-label">Source file</label><input type="text" class="form-input" id="transfer-source" readonly></div>
+        <div class="form-group"><label class="form-label">Destination machine</label><select class="form-input" id="transfer-dest-machine"></select></div>
+        <div class="form-group"><label class="form-label">Destination path</label><input type="text" class="form-input" id="transfer-dest-path" placeholder="/home/pi/"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="transfer-submit">Transfer</button>
@@ -243,6 +273,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Upload input (hidden) -->
+  <input type="file" id="file-upload-input" style="display:none">
 
   <!-- Toast container -->
   <div id="toast-container"></div>

@@ -591,14 +591,14 @@
 
     selectMsg.style.display = "none";
     card.style.display = "";
-    body.innerHTML = '<tr><td colspan="5" class="loading-indicator">Loading services...</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" class="loading-indicator">Loading services...</td></tr>';
 
     try {
       var services = await api("/api/m/" + m.id + "/services");
       body.innerHTML = "";
 
       if (!services || services.length === 0) {
-        body.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-muted)">No services found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-muted)">No services found.</td></tr>';
         return;
       }
 
@@ -625,16 +625,11 @@
       services.forEach(function (svc) {
         var tr = document.createElement("tr");
 
-        // Detect noteworthy: running + manual boot (possibly user-started or third-party)
-        var isNoteworthy = svc.active === "active" && svc.enabled === "manual";
+        var isThirdParty = svc.category === "third-party";
 
         // Name
         var tdName = document.createElement("td");
-        var nameHtml = '<span style="font-family:var(--font-mono);font-weight:500">' + escapeHtml(svc.name) + '</span>';
-        if (isNoteworthy) {
-          nameHtml += ' <span title="Running but not set to auto-start" style="color:var(--warning);font-size:0.75rem">&#9888;</span>';
-        }
-        tdName.innerHTML = nameHtml;
+        tdName.innerHTML = '<span style="font-family:var(--font-mono);font-weight:500">' + escapeHtml(svc.name) + '</span>';
         tr.appendChild(tdName);
 
         // Description
@@ -643,6 +638,15 @@
         tdDesc.textContent = svc.display_name || "";
         tdDesc.title = svc.display_name || "";
         tr.appendChild(tdDesc);
+
+        // Type (system vs third-party)
+        var tdType = document.createElement("td");
+        if (isThirdParty) {
+          tdType.innerHTML = '<span class="pill pill-yellow">tiers</span>';
+        } else {
+          tdType.innerHTML = '<span class="pill pill-blue">system</span>';
+        }
+        tr.appendChild(tdType);
 
         // Running status
         var tdStatus = document.createElement("td");

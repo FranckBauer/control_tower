@@ -462,8 +462,9 @@ async def get_services():
     if IS_WINDOWS:
         # List all real Windows services via PowerShell (fast, with description)
         result = await _async_run_powershell(
-            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Service | Select-Object Name, DisplayName, Status, StartType | ConvertTo-Json -Compress -Depth 1",
-            timeout=15
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+            "Get-CimInstance Win32_Service | Select-Object Name, DisplayName, State, StartMode, PathName | ConvertTo-Json -Compress -Depth 1",
+            timeout=20
         )
         services = []
         if result["returncode"] == 0 and result["stdout"].strip():
@@ -473,16 +474,25 @@ async def get_services():
                 if isinstance(raw, dict):
                     raw = [raw]
                 for svc in raw:
-                    # PowerShell may return string names or integer enum values
-                    status_map = {"Running": "active", "Stopped": "inactive", "StartPending": "activating", "StopPending": "deactivating",
-                                  "4": "active", "1": "inactive", "2": "activating", "3": "deactivating", "5": "activating", "6": "inactive", "7": "inactive"}
-                    start_map = {"Automatic": "enabled", "Manual": "manual", "Disabled": "disabled", "Boot": "enabled", "System": "enabled",
-                                 "2": "enabled", "3": "manual", "4": "disabled", "0": "enabled", "1": "enabled"}
+                    status_map = {"Running": "active", "Stopped": "inactive", "Start Pending": "activating", "Stop Pending": "deactivating",
+                                  "4": "active", "1": "inactive"}
+                    start_map = {"Auto": "enabled", "Automatic": "enabled", "Manual": "manual", "Disabled": "disabled",
+                                 "Boot": "enabled", "System": "enabled"}
+                    path = svc.get("PathName") or ""
+                    path_lower = path.lower().replace('"', '')
+                    # Categorize: system (Microsoft/Windows) vs third-party
+                    is_system = (
+                        path_lower.startswith("c:\\windows\\") or
+                        path_lower.startswith("\\systemroot\\") or
+                        "\\microsoft" in path_lower or
+                        not path_lower  # no path = likely system
+                    )
                     services.append({
                         "name": svc.get("Name", ""),
                         "display_name": svc.get("DisplayName", ""),
-                        "active": status_map.get(str(svc.get("Status", "")), "unknown"),
-                        "enabled": start_map.get(str(svc.get("StartType", "")), "unknown"),
+                        "active": status_map.get(str(svc.get("State", "")), "unknown"),
+                        "enabled": start_map.get(str(svc.get("StartMode", "")), "unknown"),
+                        "category": "system" if is_system else "third-party",
                     })
             except Exception:
                 pass
@@ -524,6 +534,7 @@ async def get_services():
                 "display_name": description,
                 "active": active if active in ("active", "inactive", "failed") else "unknown",
                 "enabled": "",  # filled below
+                "category": "system",  # Linux services are all system-level
             })
 
     # Get enabled status in batch

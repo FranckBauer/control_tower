@@ -547,6 +547,31 @@ main {
   font-family: var(--font-mono);
 }
 
+/* --- Detail Panel (process list, disk details) --- */
+.detail-panel-container { margin-top: 0; }
+.detail-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  animation: fadeIn 0.2s ease;
+}
+.detail-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.detail-panel-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.detail-panel-total {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 /* --- Stat Row (horizontal stat cards) --- */
 .stat-row {
   display: flex;

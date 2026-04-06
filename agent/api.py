@@ -283,6 +283,58 @@ async def get_system_info():
 
 
 # ---------------------------------------------------------------------------
+# Process list endpoint
+# ---------------------------------------------------------------------------
+
+@router.get("/api/processes")
+async def get_processes(sort: str = "cpu", limit: int = 25):
+    """Return top processes sorted by cpu or memory usage."""
+    procs = []
+    for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent", "memory_info", "status", "username"]):
+        try:
+            info = p.info
+            procs.append({
+                "pid": info["pid"],
+                "name": info["name"] or "unknown",
+                "cpu_percent": info["cpu_percent"] or 0.0,
+                "memory_percent": round(info["memory_percent"] or 0.0, 1),
+                "memory_rss": info["memory_info"].rss if info.get("memory_info") else 0,
+                "status": info["status"] or "unknown",
+                "user": info.get("username") or "",
+            })
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+
+    if sort == "memory":
+        procs.sort(key=lambda x: x["memory_percent"], reverse=True)
+    else:
+        procs.sort(key=lambda x: x["cpu_percent"], reverse=True)
+
+    return {"processes": procs[:limit], "total": len(procs)}
+
+
+@router.get("/api/disk/usage")
+async def get_disk_usage():
+    """Return disk usage per partition/drive with top directories if possible."""
+    partitions = []
+    for p in psutil.disk_partitions(all=False):
+        try:
+            usage = psutil.disk_usage(p.mountpoint)
+            partitions.append({
+                "device": p.device,
+                "mountpoint": p.mountpoint,
+                "fstype": p.fstype,
+                "total": usage.total,
+                "used": usage.used,
+                "free": usage.free,
+                "percent": usage.percent,
+            })
+        except (PermissionError, OSError):
+            pass
+    return {"partitions": partitions}
+
+
+# ---------------------------------------------------------------------------
 # Network endpoints
 # ---------------------------------------------------------------------------
 

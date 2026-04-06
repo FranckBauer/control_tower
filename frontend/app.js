@@ -251,11 +251,105 @@
   }
 
   function renderSingleMonitoring(content, data) {
-    content.innerHTML = buildSingleMachineView(data);
+    // Preserve detail panel if open
+    var existingDetail = content.querySelector(".detail-panel");
+    var openDetail = existingDetail ? existingDetail.dataset.type : null;
+
+    content.innerHTML = buildSingleMachineView(data) + '<div class="detail-panel-container" id="detail-panel-container"></div>';
     content.querySelectorAll("[data-gauge-value]").forEach(function (el) {
       el.style.setProperty("--gauge-value", el.dataset.gaugeValue);
       el.style.setProperty("--gauge-color", el.dataset.gaugeColor);
     });
+
+    // Metric card click handlers
+    content.querySelectorAll("[data-detail]").forEach(function (card) {
+      card.addEventListener("click", function () {
+        loadDetailPanel(card.dataset.detail);
+      });
+    });
+
+    // Re-open detail if it was open before refresh
+    if (openDetail) {
+      loadDetailPanel(openDetail);
+    }
+  }
+
+  async function loadDetailPanel(type) {
+    var m = selectedMachine();
+    if (!m) return;
+    var container = $("#detail-panel-container");
+    if (!container) return;
+
+    // Toggle: if same panel is open, close it
+    var existing = container.querySelector('.detail-panel[data-type="' + type + '"]');
+    if (existing) {
+      container.innerHTML = "";
+      return;
+    }
+
+    container.innerHTML = '<div class="detail-panel" data-type="' + type + '"><div class="loading-indicator">Loading...</div></div>';
+
+    try {
+      if (type === "cpu" || type === "memory") {
+        var sortBy = type === "cpu" ? "cpu" : "memory";
+        var data = await api("/api/m/" + m.id + "/processes?sort=" + sortBy + "&limit=20");
+        var procs = data.processes || [];
+
+        var html = '<div class="detail-panel" data-type="' + type + '">';
+        html += '<div class="detail-panel-header">';
+        html += '<h3>Top processes by ' + (type === "cpu" ? "CPU" : "Memory") + ' usage</h3>';
+        html += '<span class="detail-panel-total">' + (data.total || 0) + ' total processes</span>';
+        html += '</div>';
+        html += '<table><thead><tr>';
+        html += '<th>PID</th><th>Name</th><th>User</th><th>CPU %</th><th>RAM %</th><th>RAM</th><th>Status</th>';
+        html += '</tr></thead><tbody>';
+
+        procs.forEach(function (p) {
+          var cpuClass = p.cpu_percent > 50 ? "pill-red" : p.cpu_percent > 20 ? "pill-yellow" : "";
+          var memClass = p.memory_percent > 50 ? "pill-red" : p.memory_percent > 20 ? "pill-yellow" : "";
+          html += '<tr>';
+          html += '<td>' + p.pid + '</td>';
+          html += '<td><strong>' + escapeHtml(p.name) + '</strong></td>';
+          html += '<td>' + escapeHtml(p.user) + '</td>';
+          html += '<td><span class="' + cpuClass + '">' + p.cpu_percent.toFixed(1) + '%</span></td>';
+          html += '<td><span class="' + memClass + '">' + p.memory_percent.toFixed(1) + '%</span></td>';
+          html += '<td>' + formatBytes(p.memory_rss) + '</td>';
+          html += '<td>' + escapeHtml(p.status) + '</td>';
+          html += '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+
+      } else if (type === "disk") {
+        var data = await api("/api/m/" + m.id + "/disk/usage");
+        var parts = data.partitions || [];
+
+        var html = '<div class="detail-panel" data-type="' + type + '">';
+        html += '<div class="detail-panel-header"><h3>Disk partitions</h3></div>';
+        html += '<table><thead><tr>';
+        html += '<th>Device</th><th>Mount</th><th>Type</th><th>Total</th><th>Used</th><th>Free</th><th>Usage</th>';
+        html += '</tr></thead><tbody>';
+
+        parts.forEach(function (p) {
+          var usageClass = p.percent > 90 ? "pill-red" : p.percent > 70 ? "pill-yellow" : "pill-green";
+          html += '<tr>';
+          html += '<td><strong>' + escapeHtml(p.device) + '</strong></td>';
+          html += '<td>' + escapeHtml(p.mountpoint) + '</td>';
+          html += '<td>' + escapeHtml(p.fstype) + '</td>';
+          html += '<td>' + formatBytes(p.total) + '</td>';
+          html += '<td>' + formatBytes(p.used) + '</td>';
+          html += '<td>' + formatBytes(p.free) + '</td>';
+          html += '<td><span class="pill ' + usageClass + '">' + Math.round(p.percent) + '%</span></td>';
+          html += '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      }
+    } catch (err) {
+      container.innerHTML = '<div class="detail-panel" data-type="' + type + '"><div style="padding:20px;color:var(--danger)">' + escapeHtml(err.message) + '</div></div>';
+    }
   }
 
   async function fetchAllSystems() {
@@ -453,7 +547,9 @@
 
   function buildMetricCard(value, unit, label, color, subtitle) {
     var numVal = (typeof value === "number") ? value : 0;
-    return '<div class="metric-card">' +
+    var sortKey = label === "CPU" ? "cpu" : label === "Memory" ? "memory" : label === "Disk" ? "disk" : "";
+    var clickAttr = sortKey ? ' data-detail="' + sortKey + '" style="cursor:pointer" title="Click for details"' : '';
+    return '<div class="metric-card"' + clickAttr + '>' +
       '<div class="gauge" data-gauge-value="' + numVal + '" data-gauge-color="' + color + '">' +
       '<div class="gauge-inner">' +
       '<span class="gauge-value">' + value + '</span>' +

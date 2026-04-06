@@ -1,0 +1,31 @@
+{
+  "machines": [
+    {
+      "id": "formule1-win",
+      "name": "Formule1 Windows",
+      "description": "PC Ivry - Windows 11",
+      "ip": "172.23.80.1",
+      "agent_port": 3002,
+      "icon": "🪟",
+      "default_path": "C:\\"
+    },
+    {
+      "id": "formule1-wsl",
+      "name": "Formule1 WSL",
+      "description": "PC Ivry - Ubuntu WSL2",
+      "ip": "localhost",
+      "agent_port": 3001,
+      "icon": "🐧",
+      "default_path": "/"
+    },
+    {
+      "id": "rasta-server",
+      "name": "Rasta Server",
+      "description": "Raspberry Pi 5",
+      "ip": "192.168.1.16",
+      "agent_port": 3001,
+      "icon": "🍓",
+      "default_path": "/"
+    }
+  ]
+}

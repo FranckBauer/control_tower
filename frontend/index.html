@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pi Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <button class="hamburger" id="hamburger" aria-label="Menu">&#9776;</button>
+      <span class="logo">&#127827;</span>
+      <h1>Pi Dashboard</h1>
+    </div>
+    <div class="header-right">
+      <span id="current-machine-name">All machines</span>
+      <button id="btn-manage-machines" class="btn-icon" title="Manage machines">&#9881;</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav id="sidebar">
+      <a href="#" class="nav-link active" data-section="monitoring">&#9881; Monitoring</a>
+      <a href="#" class="nav-link" data-section="services">&#9881; Services</a>
+      <a href="#" class="nav-link" data-section="network">&#127760; Network</a>
+      <a href="#" class="nav-link" data-section="files">&#128193; Files</a>
+      <a href="#" class="nav-link" data-section="terminal">&#128187; Terminal</a>
+      <a href="#" class="nav-link" data-section="updates">&#128259; Updates</a>
+      <a href="#" class="nav-link" data-section="logs">&#128220; Logs</a>
+    </nav>
+
+    <main>
+      <!-- Machine selector bar -->
+      <div class="machine-bar" id="machine-selector"></div>
+
+      <!-- MONITORING -->
+      <div class="section" id="section-monitoring">
+        <h2>Monitoring</h2>
+        <div id="monitoring-content">
+          <div class="loading-indicator">Loading...</div>
+        </div>
+      </div>
+
+      <!-- SERVICES -->
+      <div class="section hidden" id="section-services">
+        <h2>Services</h2>
+        <div class="select-machine-msg hidden" id="services-select-msg">Select a machine to view services.</div>
+        <div class="card" id="services-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Enabled</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="services-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- NETWORK -->
+      <div class="section hidden" id="section-network">
+        <h2>Network</h2>
+        <div id="network-cards"></div>
+      </div>
+
+      <!-- FILES -->
+      <div class="section hidden" id="section-files">
+        <h2>Files</h2>
+        <div class="select-machine-msg hidden" id="files-select-msg">Select a machine to browse files.</div>
+        <div id="drives-bar" class="drives-bar hidden"></div>
+        <div class="card" id="files-card">
+          <div class="files-toolbar">
+            <div class="breadcrumbs" id="breadcrumbs"></div>
+            <button class="btn btn-sm" id="btn-transfer">Transfer</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Modified</th>
+              </tr>
+            </thead>
+            <tbody id="files-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TERMINAL -->
+      <div class="section hidden" id="section-terminal">
+        <h2>Terminal</h2>
+        <div class="select-machine-msg hidden" id="terminal-select-msg">Select a machine to use the terminal.</div>
+        <div class="terminal-warning hidden" id="terminal-warning">&#9888; Warning: commands execute directly on the remote machine.</div>
+        <div class="card terminal-card" id="terminal-card">
+          <div class="terminal-output" id="terminal-output"></div>
+          <div class="terminal-input-row">
+            <span class="terminal-prompt" id="terminal-prompt">$</span>
+            <input type="text" id="terminal-input" placeholder="Enter command..." autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+      </div>
+
+      <!-- UPDATES -->
+      <div class="section hidden" id="section-updates">
+        <h2>Updates</h2>
+        <div class="select-machine-msg hidden" id="updates-select-msg">Select a machine to manage updates.</div>
+        <div class="card" id="updates-card">
+          <div class="updates-actions">
+            <button id="btn-check-updates" class="btn btn-primary">Check updates</button>
+            <button id="btn-install-updates" class="btn btn-outline">Install updates</button>
+            <span class="spinner hidden" id="updates-spinner"></span>
+          </div>
+          <pre class="updates-output" id="updates-output"></pre>
+        </div>
+      </div>
+
+      <!-- LOGS -->
+      <div class="section hidden" id="section-logs">
+        <h2>Logs</h2>
+        <div class="select-machine-msg hidden" id="logs-select-msg">Select a machine to view logs.</div>
+        <div class="card" id="logs-card">
+          <div class="logs-toolbar">
+            <select id="logs-service">
+              <option value="system">system</option>
+            </select>
+            <select id="logs-lines">
+              <option value="50">50 lines</option>
+              <option value="100" selected>100 lines</option>
+              <option value="200">200 lines</option>
+              <option value="500">500 lines</option>
+            </select>
+            <button id="btn-refresh-logs" class="btn btn-primary">Refresh</button>
+          </div>
+          <pre class="logs-output" id="logs-output"></pre>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Machine Management Modal -->
+  <div class="modal-overlay hidden" id="machines-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Machine Management</h3>
+        <button class="modal-close" id="machines-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="machines-list" id="machines-list"></div>
+        <button class="btn btn-primary" id="btn-add-machine" style="margin-top: 16px;">+ Add Machine</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Machine Modal -->
+  <div class="modal-overlay hidden" id="add-machine-modal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Machine</h3>
+        <button class="modal-close" id="add-machine-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="add-machine-id">ID</label>
+          <input type="text" class="form-input" id="add-machine-id" placeholder="my-machine">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add-machine-name">Name</label>
+          <input type="text" class="form-input" id="add-machine-name" placeholder="My Raspberry Pi">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add-machine-desc">Description</label>
+          <input type="text" class="form-input" id="add-machine-desc" placeholder="Living room Pi">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add-machine-ip">IP Address</label>
+          <input type="text" class="form-input" id="add-machine-ip" placeholder="192.168.1.100">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add-machine-port">Port</label>
+          <input type="number" class="form-input" id="add-machine-port" value="3001" placeholder="3001">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add-machine-icon">Icon</label>
+          <input type="text" class="form-input" id="add-machine-icon" placeholder="&#127827;" maxlength="4">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add-machine-path">Default Path</label>
+          <input type="text" class="form-input" id="add-machine-path" placeholder="/">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="add-machine-submit">Add</button>
+        <button class="btn" id="add-machine-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Editor Modal -->
+  <div class="modal-overlay hidden" id="editor-modal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3 class="modal-title" id="editor-title">Edit file</h3>
+        <button class="modal-close" id="editor-close">&times;</button>
+      </div>
+      <textarea class="editor-textarea" id="editor-content"></textarea>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="editor-save">Save</button>
+        <button class="btn" id="editor-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Modal -->
+  <div class="modal-overlay hidden" id="transfer-modal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 class="modal-title">Transfer File</h3>
+        <button class="modal-close" id="transfer-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Source file</label>
+          <input type="text" class="form-input" id="transfer-source" readonly>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Destination machine</label>
+          <select class="form-input" id="transfer-dest-machine"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Destination path</label>
+          <input type="text" class="form-input" id="transfer-dest-path" placeholder="/home/pi/file.txt">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="transfer-submit">Transfer</button>
+        <button class="btn" id="transfer-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

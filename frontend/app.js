@@ -602,80 +602,121 @@
         return;
       }
 
-      // Build filter bar
+      // Build search bar
       var existingFilter = card.querySelector(".services-filter");
       if (existingFilter) existingFilter.remove();
-
-      // Collect unique values for each filterable column
-      var types = {}, statuses = {}, boots = {};
-      services.forEach(function (s) {
-        var t = s.category || "system"; types[t] = (types[t] || 0) + 1;
-        var st = s.active === "active" ? "running" : s.active === "inactive" ? "stopped" : s.active; statuses[st] = (statuses[st] || 0) + 1;
-        var b = s.enabled || "-"; boots[b] = (boots[b] || 0) + 1;
-      });
-
-      var activeFilters = { type: null, status: null, boot: null };
-
-      function buildFilterPills(values, filterKey) {
-        var html = '';
-        Object.keys(values).sort().forEach(function (val) {
-          html += '<span class="filter-pill" data-filter-key="' + filterKey + '" data-filter-val="' + escapeHtml(val) + '">' + escapeHtml(val) + ' <small>(' + values[val] + ')</small></span>';
-        });
-        return html;
-      }
 
       var filterDiv = document.createElement("div");
       filterDiv.className = "services-filter";
       filterDiv.innerHTML =
-        '<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">' +
+        '<div style="display:flex;gap:10px;align-items:center">' +
           '<input type="text" id="services-search" placeholder="Search..." style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius);font-size:0.85rem">' +
           '<span id="services-count" style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap">' + services.length + ' / ' + services.length + '</span>' +
-        '</div>' +
-        '<div class="filter-row"><span class="filter-label">Type:</span>' + buildFilterPills(types, "type") + '</div>' +
-        '<div class="filter-row"><span class="filter-label">Status:</span>' + buildFilterPills(statuses, "status") + '</div>' +
-        '<div class="filter-row"><span class="filter-label">Boot:</span>' + buildFilterPills(boots, "boot") + '</div>';
-
+        '</div>';
       card.querySelector(".table-wrap").insertBefore(filterDiv, card.querySelector("table"));
+
+      // Column filter state
+      var activeFilters = { type: null, status: null, boot: null };
+
+      // Collect values per column
+      var colValues = { type: {}, status: {}, boot: {} };
+      services.forEach(function (s) {
+        var t = s.category || "system"; colValues.type[t] = (colValues.type[t] || 0) + 1;
+        var st = s.active === "active" ? "running" : s.active === "inactive" ? "stopped" : s.active; colValues.status[st] = (colValues.status[st] || 0) + 1;
+        var b = s.enabled || "-"; colValues.boot[b] = (colValues.boot[b] || 0) + 1;
+      });
+
+      // Build dropdown content for each filterable column header
+      ["type", "status", "boot"].forEach(function (col) {
+        var dropdown = document.getElementById("filter-" + col);
+        if (!dropdown) return;
+        var vals = colValues[col];
+        var html = '';
+        Object.keys(vals).sort().forEach(function (val) {
+          html += '<div class="col-filter-item" data-val="' + escapeHtml(val) + '"><span class="check"></span><span>' + escapeHtml(val) + '</span><span class="count">' + vals[val] + '</span></div>';
+        });
+        html += '<div class="col-filter-clear">Clear filter</div>';
+        dropdown.innerHTML = html;
+      });
 
       function applyFilters() {
         var query = (document.getElementById("services-search").value || "").toLowerCase();
         var visible = 0;
         body.querySelectorAll("tr").forEach(function (row) {
           var text = row.textContent.toLowerCase();
-          var typeVal = row.dataset.type || "";
-          var statusVal = row.dataset.status || "";
-          var bootVal = row.dataset.boot || "";
           var matchText = !query || text.includes(query);
-          var matchType = !activeFilters.type || typeVal === activeFilters.type;
-          var matchStatus = !activeFilters.status || statusVal === activeFilters.status;
-          var matchBoot = !activeFilters.boot || bootVal === activeFilters.boot;
-          var show = matchText && matchType && matchStatus && matchBoot;
-          row.style.display = show ? "" : "none";
-          if (show) visible++;
+          var matchType = !activeFilters.type || (row.dataset.type || "") === activeFilters.type;
+          var matchStatus = !activeFilters.status || (row.dataset.status || "") === activeFilters.status;
+          var matchBoot = !activeFilters.boot || (row.dataset.boot || "") === activeFilters.boot;
+          row.style.display = (matchText && matchType && matchStatus && matchBoot) ? "" : "none";
+          if (matchText && matchType && matchStatus && matchBoot) visible++;
         });
         document.getElementById("services-count").textContent = visible + " / " + services.length;
       }
 
-      // Search handler
       filterDiv.querySelector("#services-search").addEventListener("input", applyFilters);
 
-      // Filter pill click handlers
-      filterDiv.querySelectorAll(".filter-pill").forEach(function (pill) {
-        pill.addEventListener("click", function () {
-          var key = pill.dataset.filterKey;
-          var val = pill.dataset.filterVal;
-          // Toggle: if already active, deactivate
-          if (activeFilters[key] === val) {
-            activeFilters[key] = null;
-            pill.classList.remove("active");
+      // Column header click → toggle dropdown
+      card.querySelectorAll(".th-filterable").forEach(function (th) {
+        th.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var col = th.dataset.col;
+          var dropdown = document.getElementById("filter-" + col);
+          // Close other dropdowns
+          card.querySelectorAll(".col-filter-dropdown").forEach(function (d) {
+            if (d !== dropdown) d.classList.add("hidden");
+          });
+          dropdown.classList.toggle("hidden");
+        });
+      });
+
+      // Dropdown item click → set filter
+      card.querySelectorAll(".col-filter-item").forEach(function (item) {
+        item.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var dropdown = item.closest(".col-filter-dropdown");
+          var th = item.closest(".th-filterable");
+          var col = th.dataset.col;
+          var val = item.dataset.val;
+
+          if (activeFilters[col] === val) {
+            activeFilters[col] = null;
           } else {
-            // Deactivate siblings
-            filterDiv.querySelectorAll('.filter-pill[data-filter-key="' + key + '"]').forEach(function (p) { p.classList.remove("active"); });
-            activeFilters[key] = val;
-            pill.classList.add("active");
+            activeFilters[col] = val;
           }
+
+          // Update selected state
+          dropdown.querySelectorAll(".col-filter-item").forEach(function (i) {
+            var selected = i.dataset.val === activeFilters[col];
+            i.classList.toggle("selected", selected);
+            i.querySelector(".check").textContent = selected ? "✓" : "";
+          });
+          th.classList.toggle("filtered", !!activeFilters[col]);
           applyFilters();
         });
+      });
+
+      // Clear filter button
+      card.querySelectorAll(".col-filter-clear").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var th = btn.closest(".th-filterable");
+          var col = th.dataset.col;
+          var dropdown = btn.closest(".col-filter-dropdown");
+          activeFilters[col] = null;
+          dropdown.querySelectorAll(".col-filter-item").forEach(function (i) {
+            i.classList.remove("selected");
+            i.querySelector(".check").textContent = "";
+          });
+          th.classList.remove("filtered");
+          dropdown.classList.add("hidden");
+          applyFilters();
+        });
+      });
+
+      // Close dropdowns on click outside
+      document.addEventListener("click", function () {
+        card.querySelectorAll(".col-filter-dropdown").forEach(function (d) { d.classList.add("hidden"); });
       });
 
       services.forEach(function (svc) {

@@ -663,23 +663,58 @@ tr:hover td { background: rgba(255,255,255,0.015); }
 
 /* --- Service Filters --- */
 .services-filter { padding: 0 0 12px; }
-.filter-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
-.filter-label { font-size: 0.75rem; color: var(--text-muted); min-width: 50px; text-transform: uppercase; letter-spacing: 0.05em; }
-.filter-pill {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 0.72rem;
+
+.th-filterable {
+  position: relative;
   cursor: pointer;
-  background: rgba(255,255,255,0.05);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  transition: all 0.15s;
   user-select: none;
+  white-space: nowrap;
 }
-.filter-pill:hover { border-color: var(--accent); color: var(--text); }
-.filter-pill.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent-light); }
-.filter-pill small { opacity: 0.6; }
+.th-filterable:hover { color: var(--text); }
+.th-filter-icon { font-size: 0.65rem; opacity: 0.5; margin-left: 2px; }
+.th-filterable.filtered .th-filter-icon { opacity: 1; color: var(--accent-light); }
+.th-filterable.filtered { color: var(--accent-light); }
+
+.col-filter-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 0;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.col-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.col-filter-item:hover { background: var(--bg-hover); color: var(--text); }
+.col-filter-item.selected { color: var(--accent-light); }
+.col-filter-item .check { width: 14px; text-align: center; font-size: 0.75rem; }
+.col-filter-item .count { margin-left: auto; font-size: 0.7rem; opacity: 0.5; }
+.col-filter-clear {
+  display: block;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  text-align: center;
+}
+.col-filter-clear:hover { color: var(--accent-light); }
 
 /* --- Buttons --- */
 .btn {

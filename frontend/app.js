@@ -669,68 +669,76 @@
 
       filterDiv.querySelector("#services-search").addEventListener("input", applyFilters);
 
-      // Column header click → toggle dropdown
-      card.querySelectorAll(".th-filterable").forEach(function (th) {
-        th.addEventListener("click", function (e) {
-          e.stopPropagation();
-          var col = th.dataset.col;
-          var dropdown = document.getElementById("filter-" + col);
-          // Close other dropdowns
-          card.querySelectorAll(".col-filter-dropdown").forEach(function (d) {
-            if (d !== dropdown) d.classList.add("hidden");
-          });
-          dropdown.classList.toggle("hidden");
-        });
-      });
+      // Reset filter visual state on headers
+      card.querySelectorAll(".th-filterable").forEach(function (th) { th.classList.remove("filtered"); });
 
-      // Dropdown item click → set filter
-      card.querySelectorAll(".col-filter-item").forEach(function (item) {
-        item.addEventListener("click", function (e) {
-          e.stopPropagation();
-          var dropdown = item.closest(".col-filter-dropdown");
-          var th = item.closest(".th-filterable");
-          var col = th.dataset.col;
-          var val = item.dataset.val;
+      // Use event delegation on card for all filter interactions (only bind once)
+      if (!card._filterBound) {
+        card._filterBound = true;
 
-          if (activeFilters[col] === val) {
-            activeFilters[col] = null;
-          } else {
-            activeFilters[col] = val;
+        card.addEventListener("click", function (e) {
+          // Header click → toggle dropdown
+          var th = e.target.closest(".th-filterable");
+          if (th && !e.target.closest(".col-filter-dropdown")) {
+            e.stopPropagation();
+            var col = th.dataset.col;
+            var dropdown = document.getElementById("filter-" + col);
+            card.querySelectorAll(".col-filter-dropdown").forEach(function (d) {
+              if (d !== dropdown) d.classList.add("hidden");
+            });
+            dropdown.classList.toggle("hidden");
+            return;
           }
 
-          // Update selected state
-          dropdown.querySelectorAll(".col-filter-item").forEach(function (i) {
-            var selected = i.dataset.val === activeFilters[col];
-            i.classList.toggle("selected", selected);
-            i.querySelector(".check").textContent = selected ? "✓" : "";
-          });
-          th.classList.toggle("filtered", !!activeFilters[col]);
-          applyFilters();
-        });
-      });
+          // Filter item click
+          var item = e.target.closest(".col-filter-item");
+          if (item) {
+            e.stopPropagation();
+            var dropdown = item.closest(".col-filter-dropdown");
+            var thParent = item.closest(".th-filterable");
+            var col = thParent.dataset.col;
+            var val = item.dataset.val;
 
-      // Clear filter button
-      card.querySelectorAll(".col-filter-clear").forEach(function (btn) {
-        btn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          var th = btn.closest(".th-filterable");
-          var col = th.dataset.col;
-          var dropdown = btn.closest(".col-filter-dropdown");
-          activeFilters[col] = null;
-          dropdown.querySelectorAll(".col-filter-item").forEach(function (i) {
-            i.classList.remove("selected");
-            i.querySelector(".check").textContent = "";
-          });
-          th.classList.remove("filtered");
-          dropdown.classList.add("hidden");
-          applyFilters();
-        });
-      });
+            if (activeFilters[col] === val) {
+              activeFilters[col] = null;
+            } else {
+              activeFilters[col] = val;
+            }
 
-      // Close dropdowns on click outside
-      document.addEventListener("click", function () {
-        card.querySelectorAll(".col-filter-dropdown").forEach(function (d) { d.classList.add("hidden"); });
-      });
+            dropdown.querySelectorAll(".col-filter-item").forEach(function (i) {
+              var selected = i.dataset.val === activeFilters[col];
+              i.classList.toggle("selected", selected);
+              i.querySelector(".check").textContent = selected ? "✓" : "";
+            });
+            thParent.classList.toggle("filtered", !!activeFilters[col]);
+            applyFilters();
+            return;
+          }
+
+          // Clear filter click
+          var clearBtn = e.target.closest(".col-filter-clear");
+          if (clearBtn) {
+            e.stopPropagation();
+            var thParent = clearBtn.closest(".th-filterable");
+            var col = thParent.dataset.col;
+            var dropdown = clearBtn.closest(".col-filter-dropdown");
+            activeFilters[col] = null;
+            dropdown.querySelectorAll(".col-filter-item").forEach(function (i) {
+              i.classList.remove("selected");
+              i.querySelector(".check").textContent = "";
+            });
+            thParent.classList.remove("filtered");
+            dropdown.classList.add("hidden");
+            applyFilters();
+            return;
+          }
+        });
+
+        // Close dropdowns on outside click (once)
+        document.addEventListener("click", function () {
+          card.querySelectorAll(".col-filter-dropdown").forEach(function (d) { d.classList.add("hidden"); });
+        });
+      }
 
       services.forEach(function (svc) {
         var tr = document.createElement("tr");

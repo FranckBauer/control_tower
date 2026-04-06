@@ -655,16 +655,42 @@
       function applyFilters() {
         var query = (document.getElementById("services-search").value || "").toLowerCase();
         var visible = 0;
+
+        // Count visible values per column (excluding the column's own filter)
+        var visibleCounts = { type: {}, status: {}, boot: {} };
+
         body.querySelectorAll("tr").forEach(function (row) {
           var text = row.textContent.toLowerCase();
+          var rowType = row.dataset.type || "";
+          var rowStatus = row.dataset.status || "";
+          var rowBoot = row.dataset.boot || "";
           var matchText = !query || text.includes(query);
-          var matchType = !activeFilters.type || (row.dataset.type || "") === activeFilters.type;
-          var matchStatus = !activeFilters.status || (row.dataset.status || "") === activeFilters.status;
-          var matchBoot = !activeFilters.boot || (row.dataset.boot || "") === activeFilters.boot;
-          row.style.display = (matchText && matchType && matchStatus && matchBoot) ? "" : "none";
-          if (matchText && matchType && matchStatus && matchBoot) visible++;
+          var matchType = !activeFilters.type || rowType === activeFilters.type;
+          var matchStatus = !activeFilters.status || rowStatus === activeFilters.status;
+          var matchBoot = !activeFilters.boot || rowBoot === activeFilters.boot;
+          var show = matchText && matchType && matchStatus && matchBoot;
+          row.style.display = show ? "" : "none";
+          if (show) visible++;
+
+          // For each column dropdown, count rows matching ALL OTHER filters (not this column's)
+          if (matchText && matchStatus && matchBoot) visibleCounts.type[rowType] = (visibleCounts.type[rowType] || 0) + 1;
+          if (matchText && matchType && matchBoot) visibleCounts.status[rowStatus] = (visibleCounts.status[rowStatus] || 0) + 1;
+          if (matchText && matchType && matchStatus) visibleCounts.boot[rowBoot] = (visibleCounts.boot[rowBoot] || 0) + 1;
         });
+
         document.getElementById("services-count").textContent = visible + " / " + services.length;
+
+        // Update counts in dropdowns
+        ["type", "status", "boot"].forEach(function (col) {
+          var dropdown = document.getElementById("filter-" + col);
+          if (!dropdown) return;
+          dropdown.querySelectorAll(".col-filter-item").forEach(function (item) {
+            var val = item.dataset.val;
+            var count = visibleCounts[col][val] || 0;
+            var countSpan = item.querySelector(".count");
+            if (countSpan) countSpan.textContent = count;
+          });
+        });
       }
 
       filterDiv.querySelector("#services-search").addEventListener("input", applyFilters);

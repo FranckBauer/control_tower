@@ -905,7 +905,7 @@
 
       // Interfaces — enriched with stats
       if (data.interfaces && data.interfaces.length > 0) {
-        var ifHtml = '<h3 class="net-section-title">Interfaces</h3><div class="iface-grid">';
+        var ifHtml = '<div class="iface-grid">';
         data.interfaces.forEach(function (iface) {
           var statusClass = iface.is_up ? "pill-green" : "pill-red";
           var statusText = iface.is_up ? "UP" : "DOWN";
@@ -936,7 +936,7 @@
       // Traffic summary
       if (data.io) {
         traffic.innerHTML =
-          '<h3 class="net-section-title">Traffic totals</h3>' +
+          '' +
           '<div class="traffic-grid">' +
           '<div class="traffic-item"><div class="traffic-label">Bytes sent</div><div class="traffic-value">' + formatBytes(data.io.bytes_sent) + '</div></div>' +
           '<div class="traffic-item"><div class="traffic-label">Bytes received</div><div class="traffic-value">' + formatBytes(data.io.bytes_recv) + '</div></div>' +

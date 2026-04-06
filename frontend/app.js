@@ -1495,24 +1495,18 @@
     var m = selectedMachine();
     if (!m) return;
 
-    // Load log sources (only services with actual log entries)
-    api("/api/m/" + m.id + "/logs/sources").then(function (data) {
-      var sources = data.sources || [];
-
-      select.innerHTML = "";
-      sources.forEach(function (src) {
-        var opt = document.createElement("option");
-        opt.value = src.name;
-        var parts = [];
-        if (src.last_entry) parts.push(formatDate(src.last_entry));
-        parts.push(src.name);
-        if (src.count > 0) parts.push("[" + src.count + "]");
-        opt.textContent = parts.join("  -  ");
-        select.appendChild(opt);
-      });
-
+    // Load services list for dropdown
+    api("/api/m/" + m.id + "/services").then(function (services) {
+      select.innerHTML = '<option value="system">system</option>';
+      if (services && services.length > 0) {
+        services.forEach(function (svc) {
+          var opt = document.createElement("option");
+          opt.value = svc.name;
+          opt.textContent = svc.name;
+          select.appendChild(opt);
+        });
+      }
       if (current) select.value = current;
-      if (!select.value && sources.length > 0) select.value = sources[0].name;
     }).catch(function () {
       select.innerHTML = '<option value="system">system</option>';
     });

@@ -1678,7 +1678,7 @@
       var acc = "";
       for (var i = 0; i < parts.length; i++) {
         acc += "/" + parts[i];
-        bcHtml += '<span class="bc-sep"> / </span><span class="bc-link" data-tbpath="' + escapeHtml(acc) + '">' + escapeHtml(parts[i]) + '</span>';
+        bcHtml += '<span class="bc-sep"> &rsaquo; </span><span class="bc-link" data-tbpath="' + escapeHtml(acc) + '">' + escapeHtml(parts[i]) + '</span>';
       }
     }
     breadcrumbs.innerHTML = bcHtml;

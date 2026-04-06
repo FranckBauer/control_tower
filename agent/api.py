@@ -163,15 +163,21 @@ def _read_temperature() -> Optional[float]:
     return None
 
 
-async def _async_run(cmd: str, timeout: int = 10, stdin_data: Optional[str] = None) -> dict:
+async def _async_run(cmd: str, timeout: int = 10, stdin_data: Optional[str] = None, cwd: Optional[str] = None) -> dict:
     """Run a shell command asynchronously and return stdout/stderr/returncode."""
     try:
+        # Use a valid cwd (default to C:\ on Windows to avoid UNC path issues)
+        effective_cwd = cwd
+        if IS_WINDOWS and not effective_cwd:
+            effective_cwd = "C:\\"
+
         if IS_WINDOWS:
             proc = await asyncio.create_subprocess_exec(
                 "cmd.exe", "/c", cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 stdin=asyncio.subprocess.PIPE if stdin_data else None,
+                cwd=effective_cwd,
             )
         else:
             proc = await asyncio.create_subprocess_shell(
@@ -179,6 +185,7 @@ async def _async_run(cmd: str, timeout: int = 10, stdin_data: Optional[str] = No
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 stdin=asyncio.subprocess.PIPE if stdin_data else None,
+                cwd=cwd if cwd and os.path.isdir(cwd) else None,
             )
         stdout, stderr = await asyncio.wait_for(
             proc.communicate(input=stdin_data.encode() if stdin_data else None),
@@ -712,14 +719,7 @@ async def run_terminal_command(body: TerminalCommand):
         else:
             return {"stdout": "", "stderr": f"cd: {target}: No such directory", "returncode": 1, "cwd": cwd}
 
-    # Prefix command with cd to cwd if set
-    if cwd and os.path.isdir(cwd):
-        if IS_WINDOWS:
-            full_command = f'cd /d "{cwd}" && {command}'
-        else:
-            full_command = f'cd "{cwd}" && {command}'
-    else:
-        full_command = command
+    effective_cwd = cwd if cwd and os.path.isdir(cwd) else None
 
     if IS_WINDOWS:
         cmd_lower = command.lower()
@@ -730,9 +730,9 @@ async def run_terminal_command(body: TerminalCommand):
                 ps_command = command[len("powershell "):].strip()
             result = await _async_run_powershell(ps_command, timeout=15)
         else:
-            result = await _async_run(full_command, timeout=15)
+            result = await _async_run(command, timeout=15, cwd=effective_cwd)
     else:
-        result = await _async_run(full_command, timeout=15)
+        result = await _async_run(command, timeout=15, cwd=effective_cwd)
 
     return {
         "stdout": result["stdout"],

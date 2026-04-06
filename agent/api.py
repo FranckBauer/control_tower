@@ -704,11 +704,11 @@ async def get_log_sources():
             except Exception:
                 pass
     else:
-        # Linux: list units that have journal entries
+        # Linux: list units that have journal entries (scan more entries for completeness)
         result = await _async_run(
-            "journalctl --no-pager -o json --output-fields=_SYSTEMD_UNIT -r -n 500 2>/dev/null "
-            "| grep -o '\"_SYSTEMD_UNIT\":\"[^\"]*\"' | sort | uniq -c | sort -rn | head -50",
-            timeout=10
+            "journalctl --no-pager -o json --output-fields=_SYSTEMD_UNIT -r -n 5000 2>/dev/null "
+            "| grep -o '\"_SYSTEMD_UNIT\":\"[^\"]*\"' | sort | uniq -c | sort -rn | head -80",
+            timeout=15
         )
         seen = set()
         if result["returncode"] == 0:

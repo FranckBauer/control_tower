@@ -1495,33 +1495,19 @@
     var m = selectedMachine();
     if (!m) return;
 
-    // Load both sources (with log metadata) and all services
-    Promise.all([
-      api("/api/m/" + m.id + "/logs/sources").catch(function () { return { sources: [] }; }),
-      api("/api/m/" + m.id + "/services").catch(function () { return []; })
-    ]).then(function (results) {
-      var sources = results[0].sources || [];
-      var services = results[1] || [];
-
-      // Merge: sources first (have log data), then services not already in sources
-      var sourceNames = {};
-      sources.forEach(function (s) { sourceNames[s.name] = true; });
-      services.forEach(function (svc) {
-        if (!sourceNames[svc.name] && svc.active === "active") {
-          sources.push({ name: svc.name, count: 0, last_entry: "" });
-        }
-      });
+    // Load log sources (only services with actual log entries)
+    api("/api/m/" + m.id + "/logs/sources").then(function (data) {
+      var sources = data.sources || [];
 
       select.innerHTML = "";
       sources.forEach(function (src) {
         var opt = document.createElement("option");
         opt.value = src.name;
-        // Date first, then name, then count
         var parts = [];
         if (src.last_entry) parts.push(formatDate(src.last_entry));
         parts.push(src.name);
         if (src.count > 0) parts.push("[" + src.count + "]");
-        opt.textContent = parts.join("  ");
+        opt.textContent = parts.join("  -  ");
         select.appendChild(opt);
       });
 

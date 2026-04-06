@@ -1491,27 +1491,35 @@
 
   function updateLogServiceOptions() {
     var select = $("#logs-service");
-    // Keep current selection
     var current = select.value;
-
-    // We'll add services from the service list if available
     var m = selectedMachine();
     if (!m) return;
 
-    // Fetch services to populate log dropdown
-    api("/api/m/" + m.id + "/services").then(function (services) {
-      select.innerHTML = '<option value="system">system</option>';
-      if (services && services.length > 0) {
-        services.forEach(function (svc) {
-          var opt = document.createElement("option");
-          opt.value = svc.name;
-          opt.textContent = svc.name;
-          select.appendChild(opt);
-        });
-      }
-      // Restore selection
+    // Try to load sources with log info (date, count)
+    api("/api/m/" + m.id + "/logs/sources").then(function (data) {
+      var sources = data.sources || [];
+      select.innerHTML = "";
+
+      sources.forEach(function (src) {
+        var opt = document.createElement("option");
+        opt.value = src.name;
+        var label = src.name;
+        if (src.last_entry) {
+          label += "  (" + formatDate(src.last_entry) + ")";
+        }
+        if (src.count > 0) {
+          label += "  [" + src.count + "]";
+        }
+        opt.textContent = label;
+        select.appendChild(opt);
+      });
+
       if (current) select.value = current;
-    }).catch(function () { /* keep default */ });
+      if (!select.value && sources.length > 0) select.value = sources[0].name;
+    }).catch(function () {
+      // Fallback: just system
+      select.innerHTML = '<option value="system">system</option>';
+    });
   }
 
   async function refreshLogs() {

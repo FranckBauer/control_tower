@@ -662,6 +662,83 @@ async def manage_service(name: str, action: str):
 # Logs endpoints
 # ---------------------------------------------------------------------------
 
+@router.get("/api/logs/sources")
+async def get_log_sources():
+    """List services that have log entries, with last log timestamp."""
+    sources = []
+
+    if IS_WINDOWS:
+        # Get event log providers with recent entries
+        result = await _async_run_powershell(
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+            "Get-WinEvent -ListLog * -ErrorAction SilentlyContinue "
+            "| Where-Object { $_.RecordCount -gt 0 } "
+            "| Sort-Object LastWriteTime -Descending "
+            "| Select-Object -First 50 LogName, RecordCount, LastWriteTime "
+            "| ConvertTo-Json -Compress",
+            timeout=15
+        )
+        if result["returncode"] == 0 and result["stdout"].strip():
+            try:
+                import json as _json
+                raw = _json.loads(result["stdout"])
+                if isinstance(raw, dict):
+                    raw = [raw]
+                for entry in raw:
+                    ts = entry.get("LastWriteTime", "")
+                    # PowerShell dates: "/Date(1234567890000)/" format
+                    last_date = ""
+                    if isinstance(ts, str) and "/Date(" in ts:
+                        import re
+                        match = re.search(r'/Date\((\d+)', ts)
+                        if match:
+                            from datetime import datetime, timezone
+                            last_date = datetime.fromtimestamp(int(match.group(1)) / 1000, tz=timezone.utc).isoformat()
+                    elif ts:
+                        last_date = str(ts)
+                    sources.append({
+                        "name": entry.get("LogName", ""),
+                        "count": entry.get("RecordCount", 0),
+                        "last_entry": last_date,
+                    })
+            except Exception:
+                pass
+    else:
+        # Linux: list units that have journal entries
+        result = await _async_run(
+            "journalctl --no-pager -o json --output-fields=_SYSTEMD_UNIT -r -n 500 2>/dev/null "
+            "| grep -o '\"_SYSTEMD_UNIT\":\"[^\"]*\"' | sort | uniq -c | sort -rn | head -50",
+            timeout=10
+        )
+        seen = set()
+        if result["returncode"] == 0:
+            for line in result["stdout"].strip().splitlines():
+                parts = line.strip().split('"_SYSTEMD_UNIT":"')
+                if len(parts) == 2:
+                    count = int(parts[0].strip())
+                    name = parts[1].rstrip('"').replace('.service', '')
+                    if name and name not in seen:
+                        seen.add(name)
+                        sources.append({"name": name, "count": count, "last_entry": ""})
+
+        # Get last entry date for top services
+        for src in sources[:30]:
+            ts_result = await _async_run(
+                f"journalctl -u {src['name']} -n 1 --no-pager -o short-iso 2>/dev/null | tail -1",
+                timeout=3
+            )
+            if ts_result["returncode"] == 0 and ts_result["stdout"].strip():
+                line = ts_result["stdout"].strip()
+                # First field is the ISO timestamp
+                parts = line.split(" ", 1)
+                if parts:
+                    src["last_entry"] = parts[0]
+
+    # Always add "system" at the top
+    sources.insert(0, {"name": "system", "count": -1, "last_entry": ""})
+    return {"sources": sources}
+
+
 @router.get("/api/logs")
 async def get_logs(service: str = Query(default="system"), lines: int = Query(default=100)):
     if IS_WINDOWS:

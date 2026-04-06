@@ -1284,6 +1284,7 @@
   }
 
   async function init() {
+    try {
     await loadMachines();
     showSection("monitoring");
 
@@ -1399,8 +1400,11 @@
         $$(".modal-overlay").forEach(function (o) { o.classList.add("hidden"); });
       }
     });
+
+    } catch (err) {
+      console.error("[Control Tower] init failed:", err);
+    }
   }
 
-  // Boot
   document.addEventListener("DOMContentLoaded", init);
 })();

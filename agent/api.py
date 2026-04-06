@@ -459,34 +459,99 @@ async def _get_windows_service_status(name: str) -> dict:
 @router.get("/api/services")
 async def get_services():
     if IS_WINDOWS:
+        # List all real Windows services via PowerShell (fast, with description)
+        result = await _async_run_powershell(
+            "Get-Service | Select-Object Name, DisplayName, Status, StartType | ConvertTo-Json -Compress",
+            timeout=15
+        )
         services = []
-        for name in ALLOWED_SERVICES:
-            info = await _get_windows_service_status(name)
-            services.append(info)
+        if result["returncode"] == 0 and result["stdout"].strip():
+            try:
+                import json as _json
+                raw = _json.loads(result["stdout"])
+                if isinstance(raw, dict):
+                    raw = [raw]
+                for svc in raw:
+                    # PowerShell may return string names or integer enum values
+                    status_map = {"Running": "active", "Stopped": "inactive", "StartPending": "activating", "StopPending": "deactivating",
+                                  "4": "active", "1": "inactive", "2": "activating", "3": "deactivating", "5": "activating", "6": "inactive", "7": "inactive"}
+                    start_map = {"Automatic": "enabled", "Manual": "manual", "Disabled": "disabled", "Boot": "enabled", "System": "enabled",
+                                 "2": "enabled", "3": "manual", "4": "disabled", "0": "enabled", "1": "enabled"}
+                    services.append({
+                        "name": svc.get("Name", ""),
+                        "display_name": svc.get("DisplayName", ""),
+                        "active": status_map.get(str(svc.get("Status", "")), "unknown"),
+                        "enabled": start_map.get(str(svc.get("StartType", "")), "unknown"),
+                    })
+            except Exception:
+                pass
+        # Sort: active first, then by name
+        services.sort(key=lambda s: (0 if s["active"] == "active" else 1, s["name"].lower()))
         return services
 
-    # Linux path
+    # Linux path: list all installed services dynamically
     if not shutil.which("systemctl"):
         return []
 
+    # Get all unit files of type service
+    result = await _async_run(
+        "systemctl list-units --type=service --all --no-pager --no-legend --plain",
+        timeout=10
+    )
     services = []
-    for name in ALLOWED_SERVICES:
-        active_result = await _async_run(f"systemctl is-active {name}", timeout=5)
-        enabled_result = await _async_run(f"systemctl is-enabled {name}", timeout=5)
-        active_str = active_result["stdout"].strip()
-        enabled_str = enabled_result["stdout"].strip()
-        services.append({
-            "name": name,
-            "active": active_str if active_str in ("active", "inactive") else "unknown",
-            "enabled": enabled_str if enabled_str in ("enabled", "disabled") else "unknown",
-        })
+    seen = set()
+
+    if result["returncode"] == 0:
+        for line in result["stdout"].splitlines():
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            unit = parts[0]
+            # Remove .service suffix
+            name = unit.replace(".service", "")
+            if name in seen:
+                continue
+            seen.add(name)
+
+            active = parts[2] if len(parts) > 2 else "unknown"  # active/inactive/failed
+            sub = parts[3] if len(parts) > 3 else ""
+            # Description is everything after the 4th column
+            description = " ".join(parts[4:]) if len(parts) > 4 else ""
+
+            services.append({
+                "name": name,
+                "display_name": description,
+                "active": active if active in ("active", "inactive", "failed") else "unknown",
+                "enabled": "",  # filled below
+            })
+
+    # Get enabled status in batch
+    enabled_result = await _async_run(
+        "systemctl list-unit-files --type=service --no-pager --no-legend --plain",
+        timeout=10
+    )
+    enabled_map = {}
+    if enabled_result["returncode"] == 0:
+        for line in enabled_result["stdout"].splitlines():
+            parts = line.split()
+            if len(parts) >= 2:
+                uname = parts[0].replace(".service", "")
+                enabled_map[uname] = parts[1]  # enabled/disabled/static/masked
+
+    for svc in services:
+        svc["enabled"] = enabled_map.get(svc["name"], "unknown")
+
+    # Sort: active first, then by name
+    services.sort(key=lambda s: (0 if s["active"] == "active" else 1 if s["active"] == "inactive" else 2, s["name"].lower()))
     return services
 
 
 @router.post("/api/services/{name}/{action}")
 async def manage_service(name: str, action: str):
-    if name not in ALLOWED_SERVICES:
-        raise HTTPException(status_code=400, detail=f"Service '{name}' is not in the allowed list.")
+    # Validate service name (prevent injection: only allow alphanumeric, dash, underscore, dot)
+    import re
+    if not re.match(r'^[a-zA-Z0-9._-]+$', name):
+        raise HTTPException(status_code=400, detail=f"Invalid service name.")
     if action not in ("start", "stop", "restart"):
         raise HTTPException(status_code=400, detail=f"Action '{action}' is not allowed. Use start, stop, or restart.")
 

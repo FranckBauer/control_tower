@@ -591,14 +591,14 @@
 
     selectMsg.style.display = "none";
     card.style.display = "";
-    body.innerHTML = '<tr><td colspan="4" class="loading-indicator">Loading services...</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="loading-indicator">Loading services...</td></tr>';
 
     try {
       var services = await api("/api/m/" + m.id + "/services");
       body.innerHTML = "";
 
       if (!services || services.length === 0) {
-        body.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-muted)">No services found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-muted)">No services found.</td></tr>';
         return;
       }
 
@@ -610,16 +610,24 @@
         tdName.innerHTML = '<span style="font-family:var(--font-mono);font-weight:500">' + escapeHtml(svc.name) + '</span>';
         tr.appendChild(tdName);
 
-        // Status
+        // Description
+        var tdDesc = document.createElement("td");
+        tdDesc.style.cssText = "font-size:0.8rem;color:var(--text-muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+        tdDesc.textContent = svc.display_name || "";
+        tdDesc.title = svc.display_name || "";
+        tr.appendChild(tdDesc);
+
+        // Running status
         var tdStatus = document.createElement("td");
-        var pillClass = svc.active === "active" ? "pill-green" : svc.active === "inactive" ? "pill-red" : "pill-gray";
-        tdStatus.innerHTML = '<span class="pill ' + pillClass + '">' + escapeHtml(svc.active) + '</span>';
+        var pillClass = svc.active === "active" ? "pill-green" : svc.active === "inactive" ? "pill-red" : svc.active === "failed" ? "pill-red" : "pill-gray";
+        var statusLabel = svc.active === "active" ? "running" : svc.active === "inactive" ? "stopped" : svc.active;
+        tdStatus.innerHTML = '<span class="pill ' + pillClass + '">' + escapeHtml(statusLabel) + '</span>';
         tr.appendChild(tdStatus);
 
-        // Enabled
+        // Boot (enabled/disabled/manual/static)
         var tdEnabled = document.createElement("td");
-        var enPillClass = svc.enabled === "enabled" ? "pill-blue" : svc.enabled === "disabled" ? "pill-gray" : "pill-yellow";
-        tdEnabled.innerHTML = '<span class="pill ' + enPillClass + '">' + escapeHtml(svc.enabled) + '</span>';
+        var enPillClass = svc.enabled === "enabled" ? "pill-blue" : svc.enabled === "disabled" ? "pill-gray" : svc.enabled === "manual" ? "pill-yellow" : svc.enabled === "static" ? "pill-blue" : "pill-gray";
+        tdEnabled.innerHTML = '<span class="pill ' + enPillClass + '">' + escapeHtml(svc.enabled || "-") + '</span>';
         tr.appendChild(tdEnabled);
 
         // Actions

@@ -1,14 +1,14 @@
 # Control Tower - TODO
 
-## Revue des onglets (en cours avec Franck)
-- [x] Monitoring
-- [ ] Services
-- [ ] Network
-- [ ] Files
-- [ ] Terminal
-- [ ] Updates
-- [ ] Logs
-- [ ] Machine Management (modal)
+## Revue des onglets (terminee 2026-04-06)
+- [x] Monitoring (jauges cliquables, processus, partitions)
+- [x] Services (dynamiques, descriptions, filtres Excel-style, categorie system/tiers)
+- [x] Network (stat cards cliquables, connexions actives, interfaces enrichies)
+- [x] Files (navigateur multi-drives, actions par fichier, transfer avec explorateur destination)
+- [x] Terminal (CWD persistant, Windows fix UNC path)
+- [x] Updates (Windows Get-HotFix rapide, WSL fallback apt list)
+- [x] Logs (dropdown services, system par defaut)
+- [ ] Machine Management (modal) - non teste en detail
 
 ## Bugs connus
 - [ ] CPU% processus = 0% sur Windows (psutil trop lent)
@@ -32,4 +32,3 @@
 - [ ] 3eme machine (PC campagne)
 - [ ] Responsive mobile (tester)
 - [ ] i18n francais
-- [ ] Favicon

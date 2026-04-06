@@ -289,21 +289,51 @@ async def get_system_info():
 @router.get("/api/processes")
 async def get_processes(sort: str = "cpu", limit: int = 25):
     """Return top processes sorted by cpu or memory usage."""
-    procs = []
-    for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent", "memory_info", "status", "username"]):
-        try:
-            info = p.info
-            procs.append({
-                "pid": info["pid"],
-                "name": info["name"] or "unknown",
-                "cpu_percent": info["cpu_percent"] or 0.0,
-                "memory_percent": round(info["memory_percent"] or 0.0, 1),
-                "memory_rss": info["memory_info"].rss if info.get("memory_info") else 0,
-                "status": info["status"] or "unknown",
-                "user": info.get("username") or "",
-            })
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
+    import concurrent.futures
+
+    def _collect():
+        if IS_WINDOWS:
+            # Fast path for Windows: minimal attrs to avoid slow syscalls
+            total_mem = psutil.virtual_memory().total
+            procs = []
+            for p in psutil.process_iter(["pid", "name", "memory_info"]):
+                try:
+                    info = p.info
+                    rss = info["memory_info"].rss if info.get("memory_info") else 0
+                    procs.append({
+                        "pid": info["pid"],
+                        "name": info["name"] or "unknown",
+                        "cpu_percent": 0.0,
+                        "memory_percent": round((rss / total_mem) * 100, 1) if total_mem else 0.0,
+                        "memory_rss": rss,
+                        "status": "running",
+                        "user": "",
+                    })
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+            return procs
+        else:
+            attrs = ["pid", "name", "cpu_percent", "memory_percent", "memory_info", "status", "username"]
+            procs = []
+            for p in psutil.process_iter(attrs):
+                try:
+                    info = p.info
+                    procs.append({
+                        "pid": info["pid"],
+                        "name": info["name"] or "unknown",
+                        "cpu_percent": info["cpu_percent"] or 0.0,
+                        "memory_percent": round(info["memory_percent"] or 0.0, 1),
+                        "memory_rss": info["memory_info"].rss if info.get("memory_info") else 0,
+                        "status": info["status"] or "unknown",
+                        "user": info.get("username", "") or "",
+                    })
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+            return procs
+
+    # Run in thread to avoid blocking the event loop
+    loop = asyncio.get_event_loop()
+    procs = await loop.run_in_executor(None, _collect)
 
     if sort == "memory":
         procs.sort(key=lambda x: x["memory_percent"], reverse=True)

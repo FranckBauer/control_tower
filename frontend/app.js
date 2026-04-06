@@ -251,11 +251,23 @@
   }
 
   function renderSingleMonitoring(content, data) {
-    // Preserve detail panel if open
-    var existingDetail = content.querySelector(".detail-panel");
-    var openDetail = existingDetail ? existingDetail.dataset.type : null;
+    // Preserve the detail panel DOM node if it exists
+    var detailContainer = content.querySelector("#detail-panel-container");
+    var savedDetail = null;
+    if (detailContainer && detailContainer.children.length > 0) {
+      savedDetail = detailContainer.cloneNode(true);
+    }
 
-    content.innerHTML = buildSingleMachineView(data) + '<div class="detail-panel-container" id="detail-panel-container"></div>';
+    // Rebuild gauges and sysinfo only
+    var metricsHtml = buildSingleMachineView(data) + '<div class="detail-panel-container" id="detail-panel-container"></div>';
+    content.innerHTML = metricsHtml;
+
+    // Restore saved detail panel (don't reload it)
+    if (savedDetail) {
+      var newContainer = content.querySelector("#detail-panel-container");
+      newContainer.innerHTML = savedDetail.innerHTML;
+    }
+
     content.querySelectorAll("[data-gauge-value]").forEach(function (el) {
       el.style.setProperty("--gauge-value", el.dataset.gaugeValue);
       el.style.setProperty("--gauge-color", el.dataset.gaugeColor);
@@ -267,11 +279,6 @@
         loadDetailPanel(card.dataset.detail);
       });
     });
-
-    // Re-open detail if it was open before refresh
-    if (openDetail) {
-      loadDetailPanel(openDetail);
-    }
   }
 
   async function loadDetailPanel(type) {

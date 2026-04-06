@@ -1,45 +1,48 @@
-/* ========================================
-   Pi Dashboard — Multi-Machine Frontend
-   ======================================== */
-
-(function () {
+/* ============================================
+   Pi Dashboard - Control Center
+   ============================================ */
+(function() {
   "use strict";
 
-  // --- Global State ---
-  let machines = [];
-  let currentMachine = "all";
-  let currentSection = "monitoring";
-  let commandHistory = [];
-  let historyIndex = -1;
-  let monitoringTimer = null;
-  let statusTimer = null;
-  let currentFilePath = "";
-  let editorFilePath = "";
-  let servicesList = [];
-  let terminalCwd = {};  // per-machine cwd: { machineId: "/path" }
+  // ==========================================
+  //  STATE
+  // ==========================================
+  var machines = [];
+  var currentMachine = "all";
+  var currentSection = "monitoring";
+  var commandHistory = [];
+  var historyIndex = -1;
+  var monitoringTimer = null;
+  var statusTimer = null;
+  var currentFilePath = "";
+  var editorFilePath = "";
+  var servicesList = [];
+  var terminalCwd = {};
 
-  // --- DOM helpers ---
-  const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => document.querySelectorAll(sel);
+  // ==========================================
+  //  DOM HELPERS
+  // ==========================================
+  var $ = function(sel) { return document.querySelector(sel); };
+  var $$ = function(sel) { return document.querySelectorAll(sel); };
 
-  // =============================================
-  //  HELPER FUNCTIONS
-  // =============================================
+  // ==========================================
+  //  UTILITIES
+  // ==========================================
 
   function formatBytes(bytes) {
     if (bytes == null || isNaN(bytes)) return "-";
     if (bytes === 0) return "0 B";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.min(Math.floor(Math.log(Math.abs(bytes)) / Math.log(1024)), units.length - 1);
-    return (bytes / Math.pow(1024, i)).toFixed(1).replace(/\.0$/, "") + " " + units[i];
+    var units = ["B", "KB", "MB", "GB", "TB"];
+    var i = Math.min(Math.floor(Math.log(Math.abs(bytes)) / Math.log(1024)), units.length - 1);
+    return (bytes / Math.pow(1024, i)).toFixed(1) + " " + units[i];
   }
 
   function formatUptime(seconds) {
-    if (!seconds && seconds !== 0) return "-";
-    const d = Math.floor(seconds / 86400);
-    const h = Math.floor((seconds % 86400) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const parts = [];
+    if (seconds == null) return "-";
+    var d = Math.floor(seconds / 86400);
+    var h = Math.floor((seconds % 86400) / 3600);
+    var m = Math.floor((seconds % 3600) / 60);
+    var parts = [];
     if (d) parts.push(d + "j");
     if (h) parts.push(h + "h");
     parts.push(m + "m");
@@ -49,14 +52,15 @@
   function formatDate(isoString) {
     if (!isoString) return "-";
     try {
-      const date = new Date(isoString);
+      var date = new Date(isoString);
       if (isNaN(date.getTime())) return isoString;
-      const months = ["janv.", "fevr.", "mars", "avr.", "mai", "juin", "juil.", "aout", "sept.", "oct.", "nov.", "dec."];
-      const day = date.getDate();
-      const month = months[date.getMonth()];
-      const year = date.getFullYear();
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
+      var months = ["janv.", "f\u00e9vr.", "mars", "avr.", "mai", "juin",
+                     "juil.", "ao\u00fbt", "sept.", "oct.", "nov.", "d\u00e9c."];
+      var day = date.getDate();
+      var month = months[date.getMonth()];
+      var year = date.getFullYear();
+      var hours = String(date.getHours()).padStart(2, "0");
+      var minutes = String(date.getMinutes()).padStart(2, "0");
       return day + " " + month + " " + year + " " + hours + ":" + minutes;
     } catch (e) {
       return isoString;
@@ -64,113 +68,127 @@
   }
 
   function escapeHtml(str) {
-    const div = document.createElement("div");
+    var div = document.createElement("div");
     div.appendChild(document.createTextNode(str || ""));
     return div.innerHTML;
   }
 
   function escapeAttr(str) {
-    return (str || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return (str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  // =============================================
+  // ==========================================
   //  TOAST SYSTEM
-  // =============================================
+  // ==========================================
 
   function showToast(message, type) {
     type = type || "info";
-    const container = $("#toast-container");
-    const toast = document.createElement("div");
+    var container = $("#toast-container");
+    var toast = document.createElement("div");
     toast.className = "toast toast-" + type;
     toast.textContent = message;
     container.appendChild(toast);
-    setTimeout(function () {
+    setTimeout(function() {
       toast.style.opacity = "0";
       toast.style.transform = "translateX(40px)";
       toast.style.transition = "all 0.3s ease";
-      setTimeout(function () { toast.remove(); }, 300);
+      setTimeout(function() { toast.remove(); }, 300);
     }, 4000);
   }
 
-  // =============================================
-  //  API FETCH WRAPPER
-  // =============================================
+  // ==========================================
+  //  API
+  // ==========================================
 
   function apiFetch(url, options) {
     options = options || {};
     return fetch(url, options)
-      .then(function (res) {
+      .then(function(res) {
         if (!res.ok) {
-          return res.text().then(function (t) {
+          return res.text().then(function(t) {
             throw new Error(t || "Error " + res.status);
           });
         }
-        const ct = res.headers.get("content-type") || "";
+        var ct = res.headers.get("content-type") || "";
         if (ct.includes("application/json")) return res.json();
         return res.text();
       })
-      .catch(function (err) {
+      .catch(function(err) {
         showToast(err.message, "error");
         throw err;
       });
   }
 
-  /** Build the API base URL for a given machine */
-  function machineApiBase(machineId) {
+  function apiFetchSilent(url, options) {
+    options = options || {};
+    return fetch(url, options)
+      .then(function(res) {
+        if (!res.ok) {
+          return res.text().then(function(t) {
+            throw new Error(t || "Error " + res.status);
+          });
+        }
+        var ct = res.headers.get("content-type") || "";
+        if (ct.includes("application/json")) return res.json();
+        return res.text();
+      });
+  }
+
+  function machineUrl(machineId) {
     return "/api/m/" + encodeURIComponent(machineId);
   }
 
-  /** Get machine object by id */
   function getMachine(id) {
-    return machines.find(function (m) { return m.id === id; });
+    return machines.find(function(m) { return m.id === id; });
   }
 
-  /** Get current machine object (or null if "all") */
   function getCurrentMachine() {
     if (currentMachine === "all") return null;
     return getMachine(currentMachine);
   }
 
-  /** Get online machines */
   function getOnlineMachines() {
-    return machines.filter(function (m) { return m.status === "online"; });
+    return machines.filter(function(m) { return m.status === "online"; });
   }
 
-  // =============================================
-  //  MACHINE MANAGEMENT
-  // =============================================
+  // ==========================================
+  //  MACHINES
+  // ==========================================
 
   function loadMachines() {
     return apiFetch("/api/machines")
-      .then(function (data) {
-        machines = data.machines || data || [];
+      .then(function(data) {
+        machines = Array.isArray(data) ? data : (data.machines || []);
         renderMachineSelector();
         updateHeaderMachineName();
         return machines;
       })
-      .catch(function () {
+      .catch(function() {
         machines = [];
         renderMachineSelector();
       });
   }
 
   function refreshMachineStatuses() {
-    apiFetch("/api/machines")
-      .then(function (data) {
-        machines = data.machines || data || [];
+    return apiFetchSilent("/api/machines")
+      .then(function(data) {
+        machines = Array.isArray(data) ? data : (data.machines || []);
         renderMachineSelector();
         updateHeaderMachineName();
       })
-      .catch(function () {});
+      .catch(function() {});
   }
 
   function renderMachineSelector() {
-    const container = $("#machine-selector");
-    // Keep the "All" pill, clear the rest
+    var container = $("#machine-selector");
     container.innerHTML = "";
 
-    // All pill
-    const allPill = document.createElement("div");
+    var allPill = document.createElement("div");
     allPill.className = "machine-pill" + (currentMachine === "all" ? " selected" : "");
     allPill.setAttribute("data-machine", "all");
     allPill.innerHTML =
@@ -178,11 +196,11 @@
       '<span class="machine-pill-name">All</span>';
     container.appendChild(allPill);
 
-    machines.forEach(function (m) {
-      const pill = document.createElement("div");
+    machines.forEach(function(m) {
+      var pill = document.createElement("div");
       pill.className = "machine-pill" + (currentMachine === m.id ? " selected" : "");
       pill.setAttribute("data-machine", m.id);
-      const isOnline = m.status === "online";
+      var isOnline = m.status === "online";
       pill.innerHTML =
         '<span class="machine-pill-icon">' + (m.icon || "&#127827;") + '</span>' +
         '<span class="machine-pill-name">' + escapeHtml(m.name) + '</span>' +
@@ -192,33 +210,35 @@
   }
 
   function updateHeaderMachineName() {
-    const el = $("#current-machine-name");
+    var el = $("#current-machine-name");
     if (currentMachine === "all") {
       el.textContent = "All machines";
     } else {
-      const m = getCurrentMachine();
+      var m = getCurrentMachine();
       el.textContent = m ? m.name : "Unknown";
     }
   }
 
   function selectMachine(machineId) {
     currentMachine = machineId;
+    var m = getCurrentMachine();
+    if (m && m.default_path) {
+      currentFilePath = m.default_path;
+    } else {
+      currentFilePath = "/";
+    }
     renderMachineSelector();
     updateHeaderMachineName();
-    // Reset file path when switching machines
-    const m = getCurrentMachine();
-    currentFilePath = m && m.default_path ? m.default_path : "/etc";
-    // Reload current section
     switchSection(currentSection);
   }
 
-  // =============================================
-  //  MACHINE MANAGEMENT MODAL
-  // =============================================
+  // ==========================================
+  //  MACHINE MANAGEMENT MODALS
+  // ==========================================
 
   function openMachinesModal() {
-    renderMachinesList();
     $("#machines-modal").classList.remove("hidden");
+    renderMachinesList();
   }
 
   function closeMachinesModal() {
@@ -226,57 +246,57 @@
   }
 
   function renderMachinesList() {
-    const container = $("#machines-list");
-    container.innerHTML = "";
-
+    var container = $("#machines-list");
     if (machines.length === 0) {
-      container.innerHTML = '<div class="select-machine-msg">No machines configured. Add one to get started.</div>';
+      container.innerHTML = '<p style="color:var(--text-secondary);">No machines configured.</p>';
       return;
     }
-
-    machines.forEach(function (m) {
-      const row = document.createElement("div");
-      row.className = "machine-row";
-      const isOnline = m.status === "online";
-      row.innerHTML =
-        '<span class="machine-row-icon">' + (m.icon || "&#127827;") + '</span>' +
-        '<div class="machine-row-info">' +
-          '<div class="machine-row-name">' + escapeHtml(m.name) + '</div>' +
-          '<div class="machine-row-detail">' + escapeHtml(m.description || "") + ' &mdash; ' + escapeHtml(m.tailscale_ip || m.ip || "") + '</div>' +
-        '</div>' +
-        '<span class="machine-row-status"><span class="status-dot ' + (isOnline ? "online" : "offline") + '"></span></span>' +
-        '<div class="machine-row-actions">' +
+    var html = "";
+    machines.forEach(function(m) {
+      html +=
+        '<div class="machine-row">' +
+          '<div class="machine-row-info">' +
+            '<span class="machine-row-icon">' + (m.icon || "&#127827;") + '</span>' +
+            '<div>' +
+              '<div class="machine-row-name">' + escapeHtml(m.name) + '</div>' +
+              '<div class="machine-row-details">' + escapeHtml(m.ip) + ':' + m.agent_port +
+              ' &mdash; <span class="status-dot ' + (m.status === "online" ? "online" : "offline") + '"></span> ' +
+              m.status + '</div>' +
+            '</div>' +
+          '</div>' +
           '<button class="btn btn-sm btn-danger" data-delete-machine="' + escapeAttr(m.id) + '">Delete</button>' +
         '</div>';
-      container.appendChild(row);
     });
+    container.innerHTML = html;
   }
 
   function deleteMachine(machineId) {
-    const m = getMachine(machineId);
-    const name = m ? m.name : machineId;
-    if (!confirm("Delete machine \"" + name + "\"? This cannot be undone.")) return;
-
+    var m = getMachine(machineId);
+    var name = m ? m.name : machineId;
+    if (!confirm("Delete machine \"" + name + "\"?")) return;
     apiFetch("/api/machines/" + encodeURIComponent(machineId), { method: "DELETE" })
-      .then(function () {
+      .then(function() {
         showToast("Machine deleted", "success");
         if (currentMachine === machineId) {
           currentMachine = "all";
         }
-        loadMachines().then(function () {
-          renderMachinesList();
-          switchSection(currentSection);
-        });
+        return loadMachines();
       })
-      .catch(function () {});
+      .then(function() {
+        renderMachinesList();
+        switchSection(currentSection);
+      })
+      .catch(function() {});
   }
 
   function openAddMachineModal() {
+    $("#add-machine-id").value = "";
     $("#add-machine-name").value = "";
     $("#add-machine-desc").value = "";
     $("#add-machine-ip").value = "";
     $("#add-machine-port").value = "3001";
     $("#add-machine-icon").value = "";
+    $("#add-machine-path").value = "/";
     $("#add-machine-modal").classList.remove("hidden");
   }
 
@@ -285,58 +305,69 @@
   }
 
   function submitAddMachine() {
-    const name = $("#add-machine-name").value.trim();
-    const description = $("#add-machine-desc").value.trim();
-    const ip = $("#add-machine-ip").value.trim();
-    const port = parseInt($("#add-machine-port").value, 10) || 3001;
-    const icon = $("#add-machine-icon").value.trim();
+    var id = $("#add-machine-id").value.trim();
+    var name = $("#add-machine-name").value.trim();
+    var ip = $("#add-machine-ip").value.trim();
 
-    if (!name || !ip) {
-      showToast("Name and Tailscale IP are required", "error");
+    if (!id || !name || !ip) {
+      showToast("ID, Name and IP are required", "error");
       return;
     }
+
+    var body = {
+      id: id,
+      name: name,
+      description: $("#add-machine-desc").value.trim(),
+      ip: ip,
+      agent_port: parseInt($("#add-machine-port").value, 10) || 3001,
+      icon: $("#add-machine-icon").value.trim() || "\uD83C\uDF53",
+      default_path: $("#add-machine-path").value.trim() || "/"
+    };
 
     apiFetch("/api/machines", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: name.toLowerCase().replace(/\s+/g, "-"), name: name, description: description, ip: ip, agent_port: port, icon: icon })
+      body: JSON.stringify(body)
     })
-      .then(function () {
+      .then(function() {
         showToast("Machine added", "success");
         closeAddMachineModal();
-        loadMachines().then(function () {
-          renderMachinesList();
-        });
+        return loadMachines();
       })
-      .catch(function () {});
+      .then(function() {
+        renderMachinesList();
+      })
+      .catch(function() {});
   }
 
-  // =============================================
+  // ==========================================
   //  SECTION SWITCHING
-  // =============================================
+  // ==========================================
 
   function switchSection(name) {
     currentSection = name;
-    $$(".section").forEach(function (el) { el.classList.add("hidden"); });
-    const target = $("#section-" + name);
+
+    $$(".section").forEach(function(el) { el.classList.add("hidden"); });
+    var target = $("#section-" + name);
     if (target) target.classList.remove("hidden");
 
-    $$(".nav-link").forEach(function (el) { el.classList.remove("active"); });
-    const link = document.querySelector('.nav-link[data-section="' + name + '"]');
-    if (link) link.classList.add("active");
+    $$(".nav-link").forEach(function(link) {
+      if (link.dataset.section === name) {
+        link.classList.add("active");
+      } else {
+        link.classList.remove("active");
+      }
+    });
 
-    // Close sidebar on mobile
-    $("#sidebar").classList.remove("open");
+    if (monitoringTimer) {
+      clearInterval(monitoringTimer);
+      monitoringTimer = null;
+    }
 
-    // Stop monitoring timer
-    clearInterval(monitoringTimer);
-    monitoringTimer = null;
-
-    // Load section data
     switch (name) {
       case "monitoring":
         loadMonitoring();
-        monitoringTimer = setInterval(loadMonitoring, 5000);
+        monitoringTimer = setInterval(loadMonitoring, 15000);
         break;
       case "services":
         loadServices();
@@ -344,14 +375,9 @@
       case "network":
         loadNetwork();
         break;
-      case "files": {
-        if (!currentFilePath) {
-          const fm = getCurrentMachine();
-          currentFilePath = fm && fm.default_path ? fm.default_path : "/";
-        }
-        loadFiles(currentFilePath);
+      case "files":
+        loadFiles(currentFilePath || "/");
         break;
-      }
       case "terminal":
         loadTerminal();
         break;
@@ -362,77 +388,77 @@
         loadLogsSection();
         break;
     }
+
+    // Close sidebar on mobile
+    $("#sidebar").classList.remove("open");
   }
 
-  // =============================================
-  //  SECTION: MONITORING
-  // =============================================
+  // ==========================================
+  //  MONITORING
+  // ==========================================
 
   function loadMonitoring() {
-    const container = $("#monitoring-content");
-
     if (currentMachine === "all") {
-      loadMonitoringAll(container);
+      loadMonitoringAll();
     } else {
-      loadMonitoringSingle(container);
+      loadMonitoringSingle();
     }
   }
 
-  function loadMonitoringAll(container) {
+  function loadMonitoringAll() {
+    var container = $("#monitoring-content");
+    var onlineMachines = getOnlineMachines();
+    var offlineMachines = machines.filter(function(m) { return m.status !== "online"; });
+
     if (machines.length === 0) {
-      container.innerHTML = '<div class="loading-indicator">No machines configured.</div>';
+      container.innerHTML = '<p class="text-secondary">No machines configured.</p>';
       return;
     }
 
-    // Fetch system data for each machine in parallel
-    const promises = machines.map(function (m) {
-      if (m.status !== "online") {
-        return Promise.resolve({ machine: m, data: null, offline: true });
-      }
-      return apiFetch(machineApiBase(m.id) + "/system")
-        .then(function (data) { return { machine: m, data: data, offline: false }; })
-        .catch(function () { return { machine: m, data: null, offline: true }; });
+    var promises = onlineMachines.map(function(m) {
+      return apiFetchSilent(machineUrl(m.id) + "/system")
+        .then(function(data) { return { machine: m, data: data, error: false }; })
+        .catch(function() { return { machine: m, data: null, error: true }; });
     });
 
-    Promise.all(promises).then(function (results) {
-      let html = '<div class="overview-grid">';
+    Promise.all(promises).then(function(results) {
+      var html = '<div class="overview-grid">';
 
-      results.forEach(function (r) {
-        const m = r.machine;
-        const d = r.data;
-
-        if (r.offline || !d) {
-          html +=
-            '<div class="overview-card offline-card">' +
-              '<div class="overview-card-header">' +
-                '<span class="overview-card-icon">' + (m.icon || "&#127827;") + '</span>' +
-                '<span class="overview-card-name">' + escapeHtml(m.name) + '</span>' +
-                '<span class="status-dot offline" style="margin-left: auto;"></span>' +
-              '</div>' +
-              '<div class="offline-banner">Machine offline</div>' +
-            '</div>';
-          return;
-        }
-
-        const cpu = d.cpu_percent || 0;
-        const ram = d.memory && d.memory.percent != null ? d.memory.percent : 0;
-        const disk = d.disk && d.disk.percent != null ? d.disk.percent : 0;
-        const temp = d.temperature || 0;
+      results.forEach(function(r) {
+        var m = r.machine;
+        var d = r.data;
+        var cpuVal = d ? Math.round(d.cpu_percent || 0) : 0;
+        var ramVal = d && d.memory ? Math.round(d.memory.percent || 0) : 0;
+        var diskVal = d && d.disk ? Math.round(d.disk.percent || 0) : 0;
+        var tempVal = d && d.temperature != null ? Math.round(d.temperature) : null;
+        var uptimeStr = d ? formatUptime(d.uptime_seconds) : "-";
 
         html +=
           '<div class="overview-card" data-select-machine="' + escapeAttr(m.id) + '">' +
             '<div class="overview-card-header">' +
               '<span class="overview-card-icon">' + (m.icon || "&#127827;") + '</span>' +
               '<span class="overview-card-name">' + escapeHtml(m.name) + '</span>' +
-              '<span class="status-dot online" style="margin-left: auto;"></span>' +
+              '<span class="status-dot online"></span>' +
             '</div>' +
-            '<div class="overview-card-metrics">' +
-              buildMiniMetric("CPU", cpu, "%", "var(--accent-light)") +
-              buildMiniMetric("RAM", ram, "%", "var(--warning)") +
-              buildMiniMetric("Disk", disk, "%", "var(--success)") +
-              buildMiniMetric("Temp", temp, "\u00B0C", "var(--danger)", true) +
+            '<div class="overview-metrics">' +
+              buildMiniRing("CPU", cpuVal, cpuVal + "%", metricColor(cpuVal)) +
+              buildMiniRing("RAM", ramVal, ramVal + "%", metricColor(ramVal)) +
+              buildMiniRing("Disk", diskVal, diskVal + "%", metricColor(diskVal)) +
+              buildMiniRing("Temp", tempVal != null ? tempVal : 0, tempVal != null ? tempVal + "\u00b0C" : "N/A", tempVal != null ? metricColor(tempVal > 80 ? 90 : tempVal) : "#888") +
             '</div>' +
-            '<div class="overview-card-footer">Uptime: ' + formatUptime(d.uptime_seconds) + '</div>' +
+            '<div class="overview-card-footer">Uptime: ' + escapeHtml(uptimeStr) + '</div>' +
+          '</div>';
+      });
+
+      offlineMachines.forEach(function(m) {
+        html +=
+          '<div class="overview-card overview-card-offline" data-select-machine="' + escapeAttr(m.id) + '">' +
+            '<div class="overview-card-header">' +
+              '<span class="overview-card-icon">' + (m.icon || "&#127827;") + '</span>' +
+              '<span class="overview-card-name">' + escapeHtml(m.name) + '</span>' +
+              '<span class="status-dot offline"></span>' +
+            '</div>' +
+            '<div class="overview-offline-banner">Offline</div>' +
           '</div>';
       });
 
@@ -441,97 +467,115 @@
     });
   }
 
-  function buildMiniMetric(label, value, suffix, color, isTemp) {
-    let progress;
-    if (isTemp) {
-      progress = Math.min((value / 85) * 100, 100);
-    } else {
-      progress = Math.max(0, Math.min(100, value));
-    }
-    const display = isTemp ? value.toFixed(1) + suffix : Math.round(value) + suffix;
+  function loadMonitoringSingle() {
+    var container = $("#monitoring-content");
+    var m = getCurrentMachine();
+    if (!m) return;
 
-    return '<div class="overview-metric">' +
-      '<div class="progress-ring-mini" style="--progress: ' + progress + '; --ring-color: ' + color + ';">' +
-        '<span class="progress-value">' + display + '</span>' +
-      '</div>' +
-      '<span class="overview-metric-label">' + label + '</span>' +
-    '</div>';
-  }
-
-  function loadMonitoringSingle(container) {
-    const m = getCurrentMachine();
-    if (!m) {
-      container.innerHTML = '<div class="loading-indicator">Machine not found.</div>';
-      return;
-    }
     if (m.status !== "online") {
-      container.innerHTML =
-        '<div class="offline-banner">' +
-          '<span class="offline-banner-icon">&#128268;</span>' +
-          'Machine "' + escapeHtml(m.name) + '" is offline.' +
-        '</div>';
+      container.innerHTML = '<p class="text-secondary">Machine is offline.</p>';
       return;
     }
 
-    apiFetch(machineApiBase(m.id) + "/system")
-      .then(function (data) {
-        const cpu = data.cpu_percent || 0;
-        const ram = data.memory && data.memory.percent != null ? data.memory.percent : 0;
-        const disk = data.disk && data.disk.percent != null ? data.disk.percent : 0;
-        const temp = data.temperature || 0;
-        const tempProgress = Math.min((temp / 85) * 100, 100);
-        const swapPercent = data.swap && data.swap.percent != null ? data.swap.percent : null;
+    apiFetchSilent(machineUrl(m.id) + "/system")
+      .then(function(d) {
+        var cpuVal = Math.round(d.cpu_percent || 0);
+        var ramVal = d.memory ? Math.round(d.memory.percent || 0) : 0;
+        var diskVal = d.disk ? Math.round(d.disk.percent || 0) : 0;
+        var tempVal = d.temperature != null ? Math.round(d.temperature) : null;
+        var tempDisplay = tempVal != null ? tempVal + "\u00b0C" : "N/A";
+        var tempPct = tempVal != null ? Math.min(tempVal, 100) : 0;
 
-        let html =
-          '<div class="cards-grid">' +
-            buildFullMetric("cpu", cpu, Math.round(cpu) + "%", "var(--accent-light)") +
-            buildFullMetric("ram", ram, Math.round(ram) + "%", "var(--warning)") +
-            buildFullMetric("disk", disk, Math.round(disk) + "%", "var(--success)") +
-            buildFullMetric("temp", tempProgress, temp.toFixed(1) + "\u00B0C", "var(--danger)") +
+        var html = '<div class="metrics-rings">';
+        html += buildProgressRing(cpuVal, cpuVal + "%", metricColor(cpuVal), "CPU");
+        html += buildProgressRing(ramVal, ramVal + "%", metricColor(ramVal), "RAM");
+        html += buildProgressRing(diskVal, diskVal + "%", metricColor(diskVal), "Disk");
+        html += buildProgressRing(tempPct, tempDisplay, tempVal != null ? metricColor(tempVal > 80 ? 90 : tempVal) : "#888", "Temp");
+        html += '</div>';
+
+        var loadAvg = d.load_average || [0, 0, 0];
+        var swapPct = d.swap ? d.swap.percent : null;
+        var swapStr = swapPct != null ? swapPct.toFixed(1) + "%" : "N/A";
+        if (d.swap && d.swap.total != null) {
+          swapStr += " (" + formatBytes(d.swap.used) + " / " + formatBytes(d.swap.total) + ")";
+        }
+
+        html +=
+          '<div class="system-info-grid">' +
+            buildInfoItem("Hostname", d.hostname || "-") +
+            buildInfoItem("Platform", d.platform || "-") +
+            buildInfoItem("Architecture", d.architecture || "-") +
+            buildInfoItem("Kernel", d.platform_release || "-") +
+            buildInfoItem("Uptime", formatUptime(d.uptime_seconds)) +
+            buildInfoItem("Load Average", loadAvg.map(function(v) { return v.toFixed(2); }).join(", ")) +
+            buildInfoItem("CPU Freq", d.cpu_freq ? d.cpu_freq + " MHz" : "-") +
+            buildInfoItem("CPU Count", d.cpu_count != null ? d.cpu_count : "-") +
+            buildInfoItem("Memory", d.memory ? formatBytes(d.memory.total) : "-") +
+            buildInfoItem("Disk", d.disk ? formatBytes(d.disk.total) : "-") +
+            buildInfoItem("Swap", swapStr) +
           '</div>';
 
-        html += '<div class="card info-card"><h3>System Info</h3><div class="info-grid">';
-
-        const infoItems = [
-          ["Hostname", data.hostname || "-"],
-          ["Platform", data.platform || "-"],
-          ["Architecture", data.architecture || "-"],
-          ["Kernel", data.platform_release || "-"],
-          ["Uptime", formatUptime(data.uptime_seconds)],
-          ["Load Average", data.load_average ? data.load_average.map(function (v) { return v.toFixed(2); }).join(", ") : "-"],
-          ["CPU Freq", data.cpu_freq ? Math.round(data.cpu_freq) + " MHz" : "-"],
-          ["Swap Usage", swapPercent != null ? Math.round(swapPercent) + "%" : "-"]
-        ];
-
-        infoItems.forEach(function (item) {
-          html += '<div class="info-item"><span class="info-label">' + item[0] + '</span><span class="info-value">' + escapeHtml(String(item[1])) + '</span></div>';
-        });
-
-        html += '</div></div>';
         container.innerHTML = html;
       })
-      .catch(function () {
-        container.innerHTML = '<div class="loading-indicator">Failed to load monitoring data.</div>';
+      .catch(function() {
+        container.innerHTML = '<p class="text-secondary">Failed to load system data.</p>';
       });
   }
 
-  function buildFullMetric(id, progress, display, color) {
-    const clamped = Math.max(0, Math.min(100, progress));
-    return '<div class="card metric-card">' +
-      '<div class="progress-ring" style="--progress: ' + clamped + '; --ring-color: ' + color + ';">' +
-        '<span class="progress-value">' + display + '</span>' +
-      '</div>' +
-      '<div class="metric-label">' + id.toUpperCase() + '</div>' +
+  function metricColor(value) {
+    if (value < 50) return "#4caf50";
+    if (value < 75) return "#ff9800";
+    return "#f44336";
+  }
+
+  function buildInfoItem(label, value) {
+    return '<div class="info-item"><span class="info-label">' + escapeHtml(label) + '</span><span class="info-value">' + escapeHtml(String(value)) + '</span></div>';
+  }
+
+  function buildProgressRing(value, display, color, label) {
+    var radius = 54;
+    var circumference = 2 * Math.PI * radius;
+    var offset = circumference - (value / 100) * circumference;
+
+    return '<div class="metric-card">' +
+      '<svg class="progress-ring" viewBox="0 0 120 120">' +
+        '<circle class="progress-ring-bg" cx="60" cy="60" r="' + radius + '" />' +
+        '<circle class="progress-ring-fill" cx="60" cy="60" r="' + radius + '" ' +
+          'stroke="' + color + '" ' +
+          'stroke-dasharray="' + circumference + '" ' +
+          'stroke-dashoffset="' + offset + '" />' +
+        '<text x="60" y="60" text-anchor="middle" dominant-baseline="central" class="progress-ring-text">' + escapeHtml(display) + '</text>' +
+      '</svg>' +
+      '<div class="metric-label">' + escapeHtml(label) + '</div>' +
     '</div>';
   }
 
-  // =============================================
-  //  SECTION: SERVICES
-  // =============================================
+  function buildMiniRing(label, value, display, color) {
+    var radius = 20;
+    var circumference = 2 * Math.PI * radius;
+    var pct = Math.max(0, Math.min(100, value || 0));
+    var offset = circumference - (pct / 100) * circumference;
+
+    return '<div class="mini-metric">' +
+      '<svg class="mini-ring" viewBox="0 0 48 48">' +
+        '<circle class="progress-ring-bg" cx="24" cy="24" r="' + radius + '" />' +
+        '<circle class="progress-ring-fill" cx="24" cy="24" r="' + radius + '" ' +
+          'stroke="' + color + '" ' +
+          'stroke-dasharray="' + circumference + '" ' +
+          'stroke-dashoffset="' + offset + '" />' +
+        '<text x="24" y="24" text-anchor="middle" dominant-baseline="central" class="mini-ring-text">' + escapeHtml(display) + '</text>' +
+      '</svg>' +
+      '<div class="mini-metric-label">' + escapeHtml(label) + '</div>' +
+    '</div>';
+  }
+
+  // ==========================================
+  //  SERVICES
+  // ==========================================
 
   function loadServices() {
-    const selectMsg = $("#services-select-msg");
-    const card = $("#services-card");
+    var selectMsg = $("#services-select-msg");
+    var card = $("#services-card");
 
     if (currentMachine === "all") {
       selectMsg.classList.remove("hidden");
@@ -542,381 +586,425 @@
     selectMsg.classList.add("hidden");
     card.classList.remove("hidden");
 
-    const m = getCurrentMachine();
+    var m = getCurrentMachine();
     if (!m || m.status !== "online") {
-      $("#services-body").innerHTML = '<tr><td colspan="4" class="offline-banner">Machine offline</td></tr>';
+      $("#services-body").innerHTML = '<tr><td colspan="4">Machine is offline.</td></tr>';
       return;
     }
 
-    const tbody = $("#services-body");
-    tbody.innerHTML = '<tr><td colspan="4" class="loading-indicator">Loading...</td></tr>';
+    apiFetch(machineUrl(m.id) + "/services")
+      .then(function(data) {
+        var services = Array.isArray(data) ? data : (data.services || []);
+        servicesList = services;
+        var tbody = $("#services-body");
 
-    apiFetch(machineApiBase(m.id) + "/services")
-      .then(function (data) {
-        servicesList = data.services || data || [];
-        tbody.innerHTML = "";
-        servicesList.forEach(function (svc) {
-          const tr = document.createElement("tr");
+        if (services.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4">No services found.</td></tr>';
+          return;
+        }
 
-          let statusBadge = "badge-unknown";
-          const activeStatus = svc.active || svc.status || "unknown";
-          if (activeStatus === "active") statusBadge = "badge-active";
-          else if (activeStatus === "inactive") statusBadge = "badge-inactive";
-          else if (activeStatus === "failed") statusBadge = "badge-failed";
+        var html = "";
+        services.forEach(function(svc) {
+          var activeBadge = statusBadge(svc.active, "active");
+          var enabledBadge = statusBadge(svc.enabled, "enabled");
 
-          let enabledBadge = "badge-unknown";
-          if (svc.enabled === "enabled" || svc.enabled === true) enabledBadge = "badge-enabled";
-          else if (svc.enabled === "disabled" || svc.enabled === false) enabledBadge = "badge-disabled";
-
-          tr.innerHTML =
-            '<td>' + escapeHtml(svc.name) + '</td>' +
-            '<td><span class="badge ' + statusBadge + '">' + escapeHtml(activeStatus) + '</span></td>' +
-            '<td><span class="badge ' + enabledBadge + '">' + escapeHtml(String(svc.enabled || "unknown")) + '</span></td>' +
-            '<td class="btn-group">' +
-              '<button class="btn btn-sm btn-primary" data-svc="' + escapeAttr(svc.name) + '" data-action="start">Start</button>' +
-              '<button class="btn btn-sm btn-danger" data-svc="' + escapeAttr(svc.name) + '" data-action="stop">Stop</button>' +
-              '<button class="btn btn-sm" data-svc="' + escapeAttr(svc.name) + '" data-action="restart">Restart</button>' +
-            '</td>';
-          tbody.appendChild(tr);
+          html +=
+            '<tr>' +
+              '<td>' + escapeHtml(svc.name) + '</td>' +
+              '<td>' + activeBadge + '</td>' +
+              '<td>' + enabledBadge + '</td>' +
+              '<td class="service-actions">' +
+                '<button class="btn btn-sm btn-primary" data-svc="' + escapeAttr(svc.name) + '" data-action="start">Start</button>' +
+                '<button class="btn btn-sm" data-svc="' + escapeAttr(svc.name) + '" data-action="stop">Stop</button>' +
+                '<button class="btn btn-sm" data-svc="' + escapeAttr(svc.name) + '" data-action="restart">Restart</button>' +
+              '</td>' +
+            '</tr>';
         });
+
+        tbody.innerHTML = html;
       })
-      .catch(function () {
-        tbody.innerHTML = '<tr><td colspan="4" class="loading-indicator">Failed to load services.</td></tr>';
+      .catch(function() {
+        $("#services-body").innerHTML = '<tr><td colspan="4">Failed to load services.</td></tr>';
       });
+  }
+
+  function statusBadge(value, type) {
+    var cls = "badge badge-unknown";
+    var text = value || "unknown";
+
+    if (type === "active") {
+      if (value === "active") cls = "badge badge-active";
+      else if (value === "inactive") cls = "badge badge-inactive";
+      else cls = "badge badge-unknown";
+    } else if (type === "enabled") {
+      if (value === "enabled") cls = "badge badge-enabled";
+      else if (value === "disabled") cls = "badge badge-disabled";
+      else if (value === "manual") cls = "badge badge-manual";
+      else cls = "badge badge-unknown";
+    }
+
+    return '<span class="' + cls + '">' + escapeHtml(text) + '</span>';
   }
 
   function serviceAction(name, action) {
-    if (!confirm("Confirm " + action + " for \"" + name + "\"?")) return;
+    if (!confirm(action.charAt(0).toUpperCase() + action.slice(1) + " service \"" + name + "\"?")) return;
 
-    const m = getCurrentMachine();
+    var m = getCurrentMachine();
     if (!m) return;
 
-    apiFetch(machineApiBase(m.id) + "/services/" + encodeURIComponent(name) + "/" + action, { method: "POST" })
-      .then(function () {
-        showToast(name + " " + action + " OK", "success");
+    apiFetch(machineUrl(m.id) + "/services/" + encodeURIComponent(name) + "/" + encodeURIComponent(action), {
+      method: "POST"
+    })
+      .then(function(data) {
+        showToast(data.message || "Action completed", "success");
         loadServices();
       })
-      .catch(function () {});
+      .catch(function() {});
   }
 
-  // =============================================
-  //  SECTION: NETWORK
-  // =============================================
+  // ==========================================
+  //  NETWORK
+  // ==========================================
 
   function loadNetwork() {
-    const container = $("#network-cards");
-
     if (currentMachine === "all") {
-      loadNetworkAll(container);
+      loadNetworkAll();
     } else {
-      loadNetworkSingle(container);
+      loadNetworkSingle();
     }
   }
 
-  function loadNetworkSingle(container) {
-    const m = getCurrentMachine();
+  function loadNetworkSingle() {
+    var container = $("#network-cards");
+    var m = getCurrentMachine();
     if (!m || m.status !== "online") {
-      container.innerHTML = '<div class="offline-banner"><span class="offline-banner-icon">&#128268;</span>Machine offline</div>';
+      container.innerHTML = '<p class="text-secondary">Machine is offline.</p>';
       return;
     }
 
     container.innerHTML = '<div class="loading-indicator">Loading...</div>';
 
-    apiFetch(machineApiBase(m.id) + "/network")
-      .then(function (data) {
-        container.innerHTML = "";
+    apiFetch(machineUrl(m.id) + "/network")
+      .then(function(data) {
+        var html = '<div class="network-grid">';
 
-        // Interfaces
-        const ifaces = data.interfaces || [];
-        ifaces.forEach(function (iface) {
-          const card = document.createElement("div");
-          card.className = "card";
-          card.innerHTML =
-            '<div class="net-card-title">' + escapeHtml(iface.name) + '</div>' +
-            (iface.addresses || []).map(function (a) {
-              return '<div class="net-stat"><span class="net-stat-label">IP</span><span>' + escapeHtml(a.ip || String(a)) + '</span></div>' +
-                     '<div class="net-stat"><span class="net-stat-label">Netmask</span><span>' + escapeHtml(a.netmask || "-") + '</span></div>';
-            }).join("");
-          container.appendChild(card);
+        // Interface cards
+        var interfaces = data.interfaces || [];
+        interfaces.forEach(function(iface) {
+          html += '<div class="card">';
+          html += '<h3>' + escapeHtml(iface.name) + '</h3>';
+          var addrs = iface.addresses || [];
+          if (addrs.length === 0) {
+            html += '<p class="text-secondary">No addresses</p>';
+          } else {
+            addrs.forEach(function(addr) {
+              html += '<div class="network-addr">' +
+                '<span class="network-ip">' + escapeHtml(addr.ip) + '</span>' +
+                '<span class="network-netmask">/ ' + escapeHtml(addr.netmask || "") + '</span>' +
+              '</div>';
+            });
+          }
+          html += '</div>';
         });
 
-        // Stats card
-        const io = data.io || {};
-        const stats = document.createElement("div");
-        stats.className = "card";
-        stats.innerHTML =
-          '<div class="net-card-title">Statistics</div>' +
-          '<div class="net-stat"><span class="net-stat-label">Connections</span><span>' + (data.connections || 0) + '</span></div>' +
-          '<div class="net-stat"><span class="net-stat-label">Bytes Sent</span><span>' + formatBytes(io.bytes_sent) + '</span></div>' +
-          '<div class="net-stat"><span class="net-stat-label">Bytes Recv</span><span>' + formatBytes(io.bytes_recv) + '</span></div>' +
-          '<div class="net-stat"><span class="net-stat-label">Packets Sent</span><span>' + (io.packets_sent != null ? io.packets_sent.toLocaleString() : "-") + '</span></div>' +
-          '<div class="net-stat"><span class="net-stat-label">Packets Recv</span><span>' + (io.packets_recv != null ? io.packets_recv.toLocaleString() : "-") + '</span></div>';
-        container.appendChild(stats);
+        // Statistics card
+        var io = data.io || {};
+        html += '<div class="card">';
+        html += '<h3>Statistics</h3>';
+        html += '<div class="network-stats">';
+        html += buildInfoItem("Connections", data.connections != null ? data.connections : "-");
+        html += buildInfoItem("Bytes Sent", formatBytes(io.bytes_sent));
+        html += buildInfoItem("Bytes Recv", formatBytes(io.bytes_recv));
+        html += buildInfoItem("Packets Sent", io.packets_sent != null ? io.packets_sent.toLocaleString() : "-");
+        html += buildInfoItem("Packets Recv", io.packets_recv != null ? io.packets_recv.toLocaleString() : "-");
+        html += '</div>';
+        html += '</div>';
+
+        html += '</div>';
+        container.innerHTML = html;
       })
-      .catch(function () {
-        container.innerHTML = '<div class="loading-indicator">Failed to load network data.</div>';
+      .catch(function() {
+        container.innerHTML = '<p class="text-secondary">Failed to load network data.</p>';
       });
   }
 
-  function loadNetworkAll(container) {
-    if (machines.length === 0) {
-      container.innerHTML = '<div class="loading-indicator">No machines configured.</div>';
+  function loadNetworkAll() {
+    var container = $("#network-cards");
+    var onlineMachines = getOnlineMachines();
+
+    if (onlineMachines.length === 0) {
+      container.innerHTML = '<p class="text-secondary">No online machines.</p>';
       return;
     }
 
     container.innerHTML = '<div class="loading-indicator">Loading...</div>';
 
-    const promises = machines.map(function (m) {
-      if (m.status !== "online") {
-        return Promise.resolve({ machine: m, data: null, offline: true });
-      }
-      return apiFetch(machineApiBase(m.id) + "/network")
-        .then(function (data) { return { machine: m, data: data, offline: false }; })
-        .catch(function () { return { machine: m, data: null, offline: true }; });
+    var promises = onlineMachines.map(function(m) {
+      return apiFetchSilent(machineUrl(m.id) + "/network")
+        .then(function(data) { return { machine: m, data: data }; })
+        .catch(function() { return { machine: m, data: null }; });
     });
 
-    Promise.all(promises).then(function (results) {
-      container.innerHTML = "";
+    Promise.all(promises).then(function(results) {
+      var html = '<div class="network-grid">';
 
-      results.forEach(function (r) {
-        const m = r.machine;
-        const card = document.createElement("div");
-        card.className = "card";
-
-        if (r.offline || !r.data) {
-          card.innerHTML =
-            '<div class="net-card-title">' + (m.icon || "&#127827;") + ' ' + escapeHtml(m.name) + ' <span class="status-dot offline"></span></div>' +
-            '<div style="color: var(--text-muted); font-size: 0.85rem;">Offline</div>';
-        } else {
-          const d = r.data;
-          const dio = d.io || {};
-          // Find main IP from interfaces
-          const ifaces = d.interfaces || [];
-          let mainIp = "-";
-          if (ifaces.length > 0 && ifaces[0].addresses && ifaces[0].addresses.length > 0) {
-            mainIp = ifaces[0].addresses[0].ip || "-";
+      results.forEach(function(r) {
+        var m = r.machine;
+        var d = r.data;
+        var io = d ? (d.io || {}) : {};
+        var interfaces = d ? (d.interfaces || []) : [];
+        var mainIp = "-";
+        for (var i = 0; i < interfaces.length; i++) {
+          var addrs = interfaces[i].addresses || [];
+          for (var j = 0; j < addrs.length; j++) {
+            if (addrs[j].ip && addrs[j].ip !== "127.0.0.1" && addrs[j].ip !== "::1") {
+              mainIp = addrs[j].ip;
+              break;
+            }
           }
-
-          card.innerHTML =
-            '<div class="net-card-title">' + (m.icon || "&#127827;") + ' ' + escapeHtml(m.name) + ' <span class="status-dot online"></span></div>' +
-            '<div class="net-stat"><span class="net-stat-label">Main IP</span><span>' + escapeHtml(String(mainIp)) + '</span></div>' +
-            '<div class="net-stat"><span class="net-stat-label">Bytes Sent</span><span>' + formatBytes(dio.bytes_sent) + '</span></div>' +
-            '<div class="net-stat"><span class="net-stat-label">Bytes Recv</span><span>' + formatBytes(dio.bytes_recv) + '</span></div>' +
-            '<div class="net-stat"><span class="net-stat-label">Connections</span><span>' + (d.connections || 0) + '</span></div>';
+          if (mainIp !== "-") break;
         }
-        container.appendChild(card);
+
+        html +=
+          '<div class="card">' +
+            '<div class="network-machine-header">' +
+              '<span>' + (m.icon || "&#127827;") + '</span> ' +
+              '<strong>' + escapeHtml(m.name) + '</strong>' +
+            '</div>' +
+            '<div class="network-stats">' +
+              buildInfoItem("IP", mainIp) +
+              buildInfoItem("Sent", formatBytes(io.bytes_sent)) +
+              buildInfoItem("Recv", formatBytes(io.bytes_recv)) +
+            '</div>' +
+          '</div>';
       });
+
+      html += '</div>';
+      container.innerHTML = html;
     });
   }
 
-  // =============================================
-  //  SECTION: FILES
-  // =============================================
+  // ==========================================
+  //  FILES
+  // ==========================================
 
   function loadFiles(path) {
-    const selectMsg = $("#files-select-msg");
-    const card = $("#files-card");
+    var selectMsg = $("#files-select-msg");
+    var card = $("#files-card");
+    var drivesBar = $("#drives-bar");
 
     if (currentMachine === "all") {
       selectMsg.classList.remove("hidden");
       card.classList.add("hidden");
+      drivesBar.classList.add("hidden");
       return;
     }
 
     selectMsg.classList.add("hidden");
     card.classList.remove("hidden");
 
-    const m = getCurrentMachine();
+    var m = getCurrentMachine();
     if (!m || m.status !== "online") {
-      $("#files-body").innerHTML = '<tr><td colspan="3" class="offline-banner">Machine offline</td></tr>';
+      $("#files-body").innerHTML = '<tr><td colspan="3">Machine is offline.</td></tr>';
+      drivesBar.classList.add("hidden");
       return;
     }
 
+    path = path || m.default_path || "/";
     currentFilePath = path;
-    const tbody = $("#files-body");
-    tbody.innerHTML = '<tr><td colspan="3" class="loading-indicator">Loading...</td></tr>';
 
-    // Load drives selector
     loadDrives(m);
 
-    apiFetch(machineApiBase(m.id) + "/files?path=" + encodeURIComponent(path))
-      .then(function (data) {
-        // Breadcrumbs
-        renderBreadcrumbs(path);
+    apiFetch(machineUrl(m.id) + "/files?path=" + encodeURIComponent(path))
+      .then(function(data) {
+        var actualPath = data.path || path;
+        currentFilePath = actualPath;
+        renderBreadcrumbs(actualPath);
 
-        // Files table
-        tbody.innerHTML = "";
-        const files = data.entries || data.files || data || [];
-        files.forEach(function (f) {
-          const tr = document.createElement("tr");
-          const isDir = f.is_dir || f.type === "directory";
-          const isWinPath = path.match(/^[A-Za-z]:\\/);
-          const sep = isWinPath ? "\\" : "/";
-          const base = (path === "/" || path.match(/^[A-Za-z]:\\$/)) ? path : path + sep;
-          const fullPath = base + f.name;
+        var entries = data.entries || [];
+        var tbody = $("#files-body");
 
-          if (isDir) {
-            tr.innerHTML =
-              '<td><span class="dir-icon"></span><a href="#" class="file-link" data-dir="' + escapeAttr(fullPath) + '">' + escapeHtml(f.name) + '</a></td>' +
-              '<td>-</td>' +
-              '<td>' + formatDate(f.modified) + '</td>';
+        if (entries.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3">Empty directory</td></tr>';
+          return;
+        }
+
+        var isWindows = /^[A-Za-z]:\\/.test(actualPath);
+        var sep = isWindows ? "\\" : "/";
+
+        var html = "";
+        entries.forEach(function(entry) {
+          var fullPath;
+          if (isWindows) {
+            fullPath = actualPath.replace(/\\$/, "") + "\\" + entry.name;
           } else {
-            tr.innerHTML =
-              '<td><span class="file-icon"></span><a href="#" class="file-link" data-file="' + escapeAttr(fullPath) + '">' + escapeHtml(f.name) + '</a></td>' +
-              '<td>' + formatBytes(f.size) + '</td>' +
-              '<td>' + formatDate(f.modified) + '</td>';
+            fullPath = actualPath === "/" ? "/" + entry.name : actualPath.replace(/\/$/, "") + "/" + entry.name;
           }
-          tbody.appendChild(tr);
+
+          if (entry.is_dir) {
+            html +=
+              '<tr class="file-row file-dir" data-dir="' + escapeAttr(fullPath) + '">' +
+                '<td>&#128193; ' + escapeHtml(entry.name) + '</td>' +
+                '<td>-</td>' +
+                '<td>' + formatDate(entry.modified) + '</td>' +
+              '</tr>';
+          } else {
+            html +=
+              '<tr class="file-row file-file" data-file="' + escapeAttr(fullPath) + '">' +
+                '<td>&#128196; ' + escapeHtml(entry.name) + '</td>' +
+                '<td>' + formatBytes(entry.size) + '</td>' +
+                '<td>' + formatDate(entry.modified) + '</td>' +
+              '</tr>';
+          }
         });
+
+        tbody.innerHTML = html;
       })
-      .catch(function () {
-        tbody.innerHTML = '<tr><td colspan="3" class="loading-indicator">Failed to load files.</td></tr>';
+      .catch(function() {
+        $("#files-body").innerHTML = '<tr><td colspan="3">Failed to load files.</td></tr>';
       });
   }
 
-  function loadDrives(m) {
-    const container = $("#drives-bar");
-    if (!container) return;
-    apiFetch(machineApiBase(m.id) + "/drives")
-      .then(function (data) {
-        const drives = data.drives || [];
+  function loadDrives(machine) {
+    var drivesBar = $("#drives-bar");
+
+    apiFetchSilent(machineUrl(machine.id) + "/drives")
+      .then(function(data) {
+        var drives = data.drives || [];
         if (drives.length <= 1) {
-          container.classList.add("hidden");
+          drivesBar.classList.add("hidden");
           return;
         }
-        container.classList.remove("hidden");
-        container.innerHTML = "";
-        drives.forEach(function (d) {
-          const btn = document.createElement("button");
-          btn.className = "btn btn-sm drive-btn";
-          if (currentFilePath && currentFilePath.toLowerCase().startsWith(d.path.toLowerCase())) {
-            btn.classList.add("drive-active");
-          }
-          let label = d.label || d.path;
-          if (d.percent != null) {
-            label += " (" + Math.round(d.percent) + "%)";
-          }
-          btn.textContent = label;
-          btn.addEventListener("click", function () { loadFiles(d.path); });
-          container.appendChild(btn);
+
+        drivesBar.classList.remove("hidden");
+        var html = "";
+        drives.forEach(function(drive) {
+          var isActive = currentFilePath.indexOf(drive.path) === 0;
+          var label = drive.label || drive.path;
+          var info = drive.percent != null ? " (" + drive.percent + "%)" : "";
+          html +=
+            '<button class="drive-btn' + (isActive ? " active" : "") + '" data-path="' + escapeAttr(drive.path) + '">' +
+              escapeHtml(label) + info +
+            '</button>';
+        });
+        drivesBar.innerHTML = html;
+
+        // Drive click events
+        drivesBar.querySelectorAll(".drive-btn").forEach(function(btn) {
+          btn.addEventListener("click", function() {
+            loadFiles(btn.dataset.path);
+          });
         });
       })
-      .catch(function () { container.classList.add("hidden"); });
+      .catch(function() {
+        drivesBar.classList.add("hidden");
+      });
   }
 
   function renderBreadcrumbs(path) {
-    const bc = $("#breadcrumbs");
-    bc.innerHTML = "";
+    var container = $("#breadcrumbs");
+    var isWindows = /^[A-Za-z]:\\/.test(path);
+    var html = "";
 
-    // Detect Windows path (e.g. C:\Users\...)
-    const isWinPath = path.match(/^[A-Za-z]:\\/);
-    let parts, accumulated;
-
-    if (isWinPath) {
-      const drive = path.substring(0, 3); // "C:\"
-      parts = path.substring(3).split("\\").filter(Boolean);
-      accumulated = drive;
-
-      const rootLink = document.createElement("span");
-      rootLink.className = "breadcrumb-link";
-      rootLink.textContent = drive;
-      rootLink.setAttribute("data-path", drive);
-      bc.appendChild(rootLink);
+    if (isWindows) {
+      var parts = path.split("\\").filter(function(p) { return p !== ""; });
+      // First part is drive letter like "C:"
+      var accumulated = "";
+      parts.forEach(function(part, i) {
+        if (i === 0) {
+          accumulated = part + "\\";
+        } else {
+          accumulated += part + "\\";
+        }
+        if (i < parts.length - 1) {
+          html += '<a class="breadcrumb-link" data-path="' + escapeAttr(accumulated) + '">' + escapeHtml(part) + '</a>';
+          html += '<span class="breadcrumb-sep">\\</span>';
+        } else {
+          html += '<span class="breadcrumb-current">' + escapeHtml(part) + '</span>';
+        }
+      });
     } else {
-      parts = path.split("/").filter(Boolean);
-      accumulated = "";
-
-      const rootLink = document.createElement("span");
-      rootLink.className = "breadcrumb-link";
-      rootLink.textContent = "/";
-      rootLink.setAttribute("data-path", "/");
-      bc.appendChild(rootLink);
+      html += '<a class="breadcrumb-link" data-path="/">/</a>';
+      var parts = path.split("/").filter(function(p) { return p !== ""; });
+      var accumulated = "";
+      parts.forEach(function(part, i) {
+        accumulated += "/" + part;
+        if (i < parts.length - 1) {
+          html += '<a class="breadcrumb-link" data-path="' + escapeAttr(accumulated) + '">' + escapeHtml(part) + '</a>';
+          html += '<span class="breadcrumb-sep">/</span>';
+        } else {
+          html += '<span class="breadcrumb-current">' + escapeHtml(part) + '</span>';
+        }
+      });
     }
 
-    parts.forEach(function (p, i) {
-      accumulated += (isWinPath ? (accumulated.endsWith("\\") ? "" : "\\") : "/") + p;
-      const sep = document.createElement("span");
-      sep.className = "breadcrumb-sep";
-      sep.textContent = " / ";
-      bc.appendChild(sep);
-
-      if (i < parts.length - 1) {
-        const link = document.createElement("span");
-        link.className = "breadcrumb-link";
-        link.textContent = p;
-        link.setAttribute("data-path", accumulated);
-        bc.appendChild(link);
-      } else {
-        const span = document.createElement("span");
-        span.textContent = p;
-        bc.appendChild(span);
-      }
-    });
+    container.innerHTML = html;
   }
 
   function loadFileContent(path) {
-    const m = getCurrentMachine();
+    var m = getCurrentMachine();
     if (!m) return;
 
-    editorFilePath = path;
-    apiFetch(machineApiBase(m.id) + "/files/content?path=" + encodeURIComponent(path))
-      .then(function (data) {
-        const content = typeof data === "string" ? data : (data.content || "");
-        $("#editor-title").textContent = path;
-        $("#editor-content").value = content;
+    apiFetch(machineUrl(m.id) + "/files/content?path=" + encodeURIComponent(path))
+      .then(function(data) {
+        editorFilePath = data.path || path;
+        $("#editor-title").textContent = "Edit: " + editorFilePath;
+        $("#editor-content").value = data.content || "";
         $("#editor-modal").classList.remove("hidden");
       })
-      .catch(function () {});
+      .catch(function() {});
   }
 
   function saveFile(path, content) {
-    const m = getCurrentMachine();
+    var m = getCurrentMachine();
     if (!m) return;
 
-    apiFetch(machineApiBase(m.id) + "/files/content", {
+    apiFetch(machineUrl(m.id) + "/files/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: path, content: content })
     })
-      .then(function () {
-        showToast("File saved", "success");
+      .then(function(data) {
+        showToast(data.message || "File saved", "success");
         $("#editor-modal").classList.add("hidden");
       })
-      .catch(function () {});
+      .catch(function() {});
   }
 
-  // --- Transfer ---
-
   function openTransferModal() {
-    if (currentMachine === "all") {
+    var m = getCurrentMachine();
+    if (!m) {
       showToast("Select a machine first", "error");
       return;
     }
-    // Populate source
-    $("#transfer-source").value = editorFilePath || currentFilePath;
 
-    // Populate destination machines (exclude current)
-    const select = $("#transfer-dest-machine");
-    select.innerHTML = "";
-    machines.forEach(function (m) {
-      if (m.id === currentMachine) return;
-      const opt = document.createElement("option");
-      opt.value = m.id;
-      opt.textContent = m.name + (m.status !== "online" ? " (offline)" : "");
-      select.appendChild(opt);
+    // Set source to the current file path
+    $("#transfer-source").value = currentFilePath;
+
+    // Populate destination machine dropdown
+    var select = $("#transfer-dest-machine");
+    var html = "";
+    machines.forEach(function(mach) {
+      if (mach.id !== m.id) {
+        html += '<option value="' + escapeAttr(mach.id) + '">' + escapeHtml(mach.name) + '</option>';
+      }
     });
-
+    select.innerHTML = html;
     $("#transfer-dest-path").value = "";
+
     $("#transfer-modal").classList.remove("hidden");
   }
 
   function submitTransfer() {
-    const source = $("#transfer-source").value;
-    const destMachineId = $("#transfer-dest-machine").value;
-    const destPath = $("#transfer-dest-path").value.trim();
+    var m = getCurrentMachine();
+    if (!m) return;
 
-    if (!destMachineId || !destPath) {
-      showToast("Please fill all fields", "error");
+    var sourcePath = $("#transfer-source").value.trim();
+    var destMachine = $("#transfer-dest-machine").value;
+    var destPath = $("#transfer-dest-path").value.trim();
+
+    if (!sourcePath || !destMachine || !destPath) {
+      showToast("All fields are required", "error");
       return;
     }
 
@@ -924,27 +1012,27 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        source_machine: currentMachine,
-        source_path: source,
-        dest_machine: destMachineId,
+        source_machine: m.id,
+        source_path: sourcePath,
+        dest_machine: destMachine,
         dest_path: destPath
       })
     })
-      .then(function () {
-        showToast("File transferred", "success");
+      .then(function(data) {
+        showToast(data.message || "Transfer completed", "success");
         $("#transfer-modal").classList.add("hidden");
       })
-      .catch(function () {});
+      .catch(function() {});
   }
 
-  // =============================================
-  //  SECTION: TERMINAL
-  // =============================================
+  // ==========================================
+  //  TERMINAL
+  // ==========================================
 
   function loadTerminal() {
-    const selectMsg = $("#terminal-select-msg");
-    const warning = $("#terminal-warning");
-    const card = $("#terminal-card");
+    var selectMsg = $("#terminal-select-msg");
+    var warning = $("#terminal-warning");
+    var card = $("#terminal-card");
 
     if (currentMachine === "all") {
       selectMsg.classList.remove("hidden");
@@ -957,93 +1045,90 @@
     warning.classList.remove("hidden");
     card.classList.remove("hidden");
 
-    // Update prompt
-    const m = getCurrentMachine();
-    updateTerminalPrompt(m);
-
-    setTimeout(function () { $("#terminal-input").focus(); }, 100);
+    var m = getCurrentMachine();
+    if (m) {
+      updateTerminalPrompt(m);
+      $("#terminal-input").focus();
+    }
   }
 
   function getTerminalCwd(machineId) {
     return terminalCwd[machineId] || null;
   }
 
-  function updateTerminalPrompt(m) {
-    if (!m) { $("#terminal-prompt").textContent = "$"; return; }
-    const cwd = getTerminalCwd(m.id);
-    const cwdDisplay = cwd ? " " + cwd : "";
-    $("#terminal-prompt").textContent = m.name + cwdDisplay + " $";
+  function updateTerminalPrompt(machine) {
+    var cwd = getTerminalCwd(machine.id);
+    var prompt = escapeHtml(machine.name);
+    if (cwd) prompt += " " + escapeHtml(cwd);
+    prompt += " $";
+    $("#terminal-prompt").textContent = prompt;
   }
 
   function runCommand(cmd) {
-    if (!cmd.trim()) return;
+    if (!cmd || !cmd.trim()) return;
 
-    const m = getCurrentMachine();
-    if (!m) {
-      showToast("Select a machine first", "error");
-      return;
-    }
-
-    if (m.status !== "online") {
-      showToast("Machine is offline", "error");
-      return;
-    }
+    var m = getCurrentMachine();
+    if (!m) return;
 
     // Add to history
     commandHistory.push(cmd);
     historyIndex = commandHistory.length;
 
-    // Show command in output
-    const output = $("#terminal-output");
-    const cwd = getTerminalCwd(m.id);
-    const cmdDiv = document.createElement("div");
+    var output = $("#terminal-output");
+    var cwd = getTerminalCwd(m.id);
+
+    // Show the command
+    var cmdDiv = document.createElement("div");
     cmdDiv.className = "cmd-line";
-    cmdDiv.textContent = m.name + (cwd ? " " + cwd : "") + " $ " + cmd;
+    var promptText = m.name;
+    if (cwd) promptText += " " + cwd;
+    promptText += " $ " + cmd;
+    cmdDiv.textContent = promptText;
     output.appendChild(cmdDiv);
 
-    apiFetch(machineApiBase(m.id) + "/terminal", {
+    var body = { command: cmd };
+    if (cwd) body.cwd = cwd;
+
+    apiFetch(machineUrl(m.id) + "/terminal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ command: cmd, cwd: cwd })
+      body: JSON.stringify(body)
     })
-      .then(function (data) {
-        // Update cwd if returned
+      .then(function(data) {
+        if (data.stdout) {
+          var stdoutDiv = document.createElement("div");
+          stdoutDiv.className = "cmd-output";
+          stdoutDiv.textContent = data.stdout;
+          output.appendChild(stdoutDiv);
+        }
+        if (data.stderr) {
+          var stderrDiv = document.createElement("div");
+          stderrDiv.className = "cmd-error";
+          stderrDiv.textContent = data.stderr;
+          output.appendChild(stderrDiv);
+        }
         if (data.cwd) {
           terminalCwd[m.id] = data.cwd;
-          updateTerminalPrompt(m);
         }
-        const text = typeof data === "string" ? data : (data.stdout || "");
-        if (text) {
-          const outDiv = document.createElement("div");
-          outDiv.className = "cmd-output";
-          outDiv.textContent = text;
-          output.appendChild(outDiv);
-        }
-        const err = data.stderr || data.error || "";
-        if (err) {
-          const errDiv = document.createElement("div");
-          errDiv.className = "cmd-error";
-          errDiv.textContent = err;
-          output.appendChild(errDiv);
-        }
+        updateTerminalPrompt(m);
         output.scrollTop = output.scrollHeight;
       })
-      .catch(function (err) {
-        const errDiv = document.createElement("div");
+      .catch(function(err) {
+        var errDiv = document.createElement("div");
         errDiv.className = "cmd-error";
-        errDiv.textContent = err.message;
+        errDiv.textContent = "Error: " + err.message;
         output.appendChild(errDiv);
         output.scrollTop = output.scrollHeight;
       });
   }
 
-  // =============================================
-  //  SECTION: UPDATES
-  // =============================================
+  // ==========================================
+  //  UPDATES
+  // ==========================================
 
   function loadUpdatesSection() {
-    const selectMsg = $("#updates-select-msg");
-    const card = $("#updates-card");
+    var selectMsg = $("#updates-select-msg");
+    var card = $("#updates-card");
 
     if (currentMachine === "all") {
       selectMsg.classList.remove("hidden");
@@ -1054,57 +1139,66 @@
     selectMsg.classList.add("hidden");
     card.classList.remove("hidden");
     $("#updates-output").textContent = "";
+    $("#updates-spinner").classList.add("hidden");
   }
 
   function checkUpdates() {
-    const m = getCurrentMachine();
-    if (!m) { showToast("Select a machine first", "error"); return; }
-    if (m.status !== "online") { showToast("Machine is offline", "error"); return; }
+    var m = getCurrentMachine();
+    if (!m) return;
 
-    const spinner = $("#updates-spinner");
-    const output = $("#updates-output");
+    var spinner = $("#updates-spinner");
+    var outputEl = $("#updates-output");
     spinner.classList.remove("hidden");
-    output.textContent = "Checking for updates...\n";
+    outputEl.textContent = "Checking for updates...";
 
-    apiFetch(machineApiBase(m.id) + "/update/check", { method: "POST" })
-      .then(function (data) {
+    apiFetch(machineUrl(m.id) + "/update/check", { method: "POST" })
+      .then(function(data) {
         spinner.classList.add("hidden");
-        output.textContent = typeof data === "string" ? data : (data.output || JSON.stringify(data, null, 2));
+        outputEl.textContent = data.output || "No output";
+        if (data.success) {
+          showToast("Update check completed", "success");
+        }
       })
-      .catch(function () {
+      .catch(function() {
         spinner.classList.add("hidden");
+        outputEl.textContent = "Failed to check updates.";
       });
   }
 
   function installUpdates() {
-    const m = getCurrentMachine();
-    if (!m) { showToast("Select a machine first", "error"); return; }
-    if (m.status !== "online") { showToast("Machine is offline", "error"); return; }
-    if (!confirm("Install all available updates on \"" + m.name + "\"? This may take a while.")) return;
+    if (!confirm("Install updates? This may take a while and could require a reboot.")) return;
 
-    const spinner = $("#updates-spinner");
-    const output = $("#updates-output");
+    var m = getCurrentMachine();
+    if (!m) return;
+
+    var spinner = $("#updates-spinner");
+    var outputEl = $("#updates-output");
     spinner.classList.remove("hidden");
-    output.textContent = "Installing updates...\n";
+    outputEl.textContent = "Installing updates...";
 
-    apiFetch(machineApiBase(m.id) + "/update/upgrade", { method: "POST" })
-      .then(function (data) {
+    apiFetch(machineUrl(m.id) + "/update/upgrade", { method: "POST" })
+      .then(function(data) {
         spinner.classList.add("hidden");
-        output.textContent = typeof data === "string" ? data : (data.output || JSON.stringify(data, null, 2));
-        showToast("Update complete", "success");
+        outputEl.textContent = data.output || "No output";
+        if (data.success) {
+          showToast("Updates installed successfully", "success");
+        } else {
+          showToast("Update may have encountered issues", "error");
+        }
       })
-      .catch(function () {
+      .catch(function() {
         spinner.classList.add("hidden");
+        outputEl.textContent = "Failed to install updates.";
       });
   }
 
-  // =============================================
-  //  SECTION: LOGS
-  // =============================================
+  // ==========================================
+  //  LOGS
+  // ==========================================
 
   function loadLogsSection() {
-    const selectMsg = $("#logs-select-msg");
-    const card = $("#logs-card");
+    var selectMsg = $("#logs-select-msg");
+    var card = $("#logs-card");
 
     if (currentMachine === "all") {
       selectMsg.classList.remove("hidden");
@@ -1116,168 +1210,141 @@
     card.classList.remove("hidden");
 
     populateLogsDropdown();
-    loadLogs($("#logs-service").value);
+
+    var service = $("#logs-service").value || "system";
+    loadLogs(service);
   }
 
   function populateLogsDropdown() {
-    const select = $("#logs-service");
-    const current = select.value;
-    let options = '<option value="system">system</option>';
-    servicesList.forEach(function (svc) {
-      options += '<option value="' + escapeAttr(svc.name) + '">' + escapeHtml(svc.name) + '</option>';
+    var select = $("#logs-service");
+    var html = '<option value="system">system</option>';
+    servicesList.forEach(function(svc) {
+      if (svc.name !== "system") {
+        html += '<option value="' + escapeAttr(svc.name) + '">' + escapeHtml(svc.name) + '</option>';
+      }
     });
-    select.innerHTML = options;
-    if (current && select.querySelector('option[value="' + CSS.escape(current) + '"]')) {
-      select.value = current;
-    }
+    select.innerHTML = html;
   }
 
   function loadLogs(service) {
-    const m = getCurrentMachine();
+    var m = getCurrentMachine();
     if (!m) return;
-    if (m.status !== "online") {
-      $("#logs-output").textContent = "Machine is offline.";
-      return;
-    }
 
-    const output = $("#logs-output");
-    output.textContent = "Loading logs...";
-    const lines = $("#logs-lines").value || 100;
+    var lines = $("#logs-lines").value || "100";
+    var outputEl = $("#logs-output");
+    outputEl.textContent = "Loading logs...";
 
-    apiFetch(machineApiBase(m.id) + "/logs?service=" + encodeURIComponent(service || "system") + "&lines=" + lines)
-      .then(function (data) {
-        output.textContent = data.lines ? data.lines.join("\n") : (typeof data === "string" ? data : JSON.stringify(data, null, 2));
-        output.scrollTop = output.scrollHeight;
+    apiFetch(machineUrl(m.id) + "/logs?service=" + encodeURIComponent(service) + "&lines=" + encodeURIComponent(lines))
+      .then(function(data) {
+        var logLines = data.lines || [];
+        outputEl.textContent = logLines.join("\n") || "No logs found.";
+        outputEl.scrollTop = outputEl.scrollHeight;
       })
-      .catch(function () {
-        output.textContent = "Failed to load logs.";
+      .catch(function() {
+        outputEl.textContent = "Failed to load logs.";
       });
   }
 
-  // =============================================
-  //  EVENT LISTENERS
-  // =============================================
+  // ==========================================
+  //  EVENT LISTENERS & INIT
+  // ==========================================
 
   function init() {
-    // --- Navigation ---
-    $$(".nav-link").forEach(function (link) {
-      link.addEventListener("click", function (e) {
+    // Navigation clicks
+    $$(".nav-link").forEach(function(link) {
+      link.addEventListener("click", function(e) {
         e.preventDefault();
-        switchSection(this.getAttribute("data-section"));
+        switchSection(link.dataset.section);
       });
     });
 
-    // --- Hamburger ---
-    $("#hamburger").addEventListener("click", function () {
+    // Hamburger toggle
+    $("#hamburger").addEventListener("click", function() {
       $("#sidebar").classList.toggle("open");
     });
 
     // Close sidebar on click outside (mobile)
-    document.addEventListener("click", function (e) {
-      const sidebar = $("#sidebar");
-      const hamburger = $("#hamburger");
-      if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== hamburger) {
-        sidebar.classList.remove("open");
+    document.addEventListener("click", function(e) {
+      var sb = $("#sidebar");
+      if (sb.classList.contains("open") && !sb.contains(e.target) && e.target !== $("#hamburger")) {
+        sb.classList.remove("open");
       }
     });
 
-    // --- Machine Selector ---
-    $("#machine-selector").addEventListener("click", function (e) {
-      const pill = e.target.closest(".machine-pill");
-      if (!pill) return;
-      const machineId = pill.getAttribute("data-machine");
-      selectMachine(machineId);
+    // Machine selector clicks (event delegation)
+    $("#machine-selector").addEventListener("click", function(e) {
+      var pill = e.target.closest(".machine-pill");
+      if (pill) selectMachine(pill.dataset.machine);
     });
 
-    // --- Machine Selector: click on overview card ---
-    document.addEventListener("click", function (e) {
-      const card = e.target.closest("[data-select-machine]");
-      if (!card) return;
-      selectMachine(card.getAttribute("data-select-machine"));
+    // Overview card clicks -> select machine
+    document.addEventListener("click", function(e) {
+      var card = e.target.closest("[data-select-machine]");
+      if (card) selectMachine(card.dataset.selectMachine);
     });
 
-    // --- Machine Management ---
-    $("#btn-manage-machines").addEventListener("click", function () {
-      openMachinesModal();
-    });
-
+    // Machine management
+    $("#btn-manage-machines").addEventListener("click", openMachinesModal);
     $("#machines-modal-close").addEventListener("click", closeMachinesModal);
-    $("#machines-modal").addEventListener("click", function (e) {
-      if (e.target === this) closeMachinesModal();
+    $("#machines-modal").addEventListener("click", function(e) {
+      if (e.target === e.currentTarget) closeMachinesModal();
     });
-
-    // Delete machine from management list
-    $("#machines-list").addEventListener("click", function (e) {
-      const btn = e.target.closest("[data-delete-machine]");
-      if (!btn) return;
-      deleteMachine(btn.getAttribute("data-delete-machine"));
+    $("#machines-list").addEventListener("click", function(e) {
+      var btn = e.target.closest("[data-delete-machine]");
+      if (btn) deleteMachine(btn.dataset.deleteMachine);
     });
-
-    // Add machine
     $("#btn-add-machine").addEventListener("click", openAddMachineModal);
     $("#add-machine-close").addEventListener("click", closeAddMachineModal);
     $("#add-machine-cancel").addEventListener("click", closeAddMachineModal);
-    $("#add-machine-modal").addEventListener("click", function (e) {
-      if (e.target === this) closeAddMachineModal();
+    $("#add-machine-modal").addEventListener("click", function(e) {
+      if (e.target === e.currentTarget) closeAddMachineModal();
     });
     $("#add-machine-submit").addEventListener("click", submitAddMachine);
 
-    // --- Services ---
-    $("#services-body").addEventListener("click", function (e) {
-      const btn = e.target.closest("button[data-svc]");
-      if (!btn) return;
-      serviceAction(btn.getAttribute("data-svc"), btn.getAttribute("data-action"));
+    // Services action buttons (delegation)
+    $("#services-body").addEventListener("click", function(e) {
+      var btn = e.target.closest("button[data-svc]");
+      if (btn) serviceAction(btn.dataset.svc, btn.dataset.action);
     });
 
-    // --- Files: Breadcrumb clicks ---
-    $("#breadcrumbs").addEventListener("click", function (e) {
-      const link = e.target.closest(".breadcrumb-link");
-      if (!link) return;
-      loadFiles(link.getAttribute("data-path"));
+    // Files: breadcrumb clicks
+    $("#breadcrumbs").addEventListener("click", function(e) {
+      var link = e.target.closest("[data-path]");
+      if (link) loadFiles(link.dataset.path);
     });
 
-    // --- Files: File/dir clicks ---
-    $("#files-body").addEventListener("click", function (e) {
+    // Files: dir/file clicks
+    $("#files-body").addEventListener("click", function(e) {
       e.preventDefault();
-      let link = e.target.closest("[data-dir]");
-      if (link) {
-        loadFiles(link.getAttribute("data-dir"));
-        return;
-      }
-      link = e.target.closest("[data-file]");
-      if (link) {
-        loadFileContent(link.getAttribute("data-file"));
-      }
+      var dir = e.target.closest("[data-dir]");
+      if (dir) { loadFiles(dir.dataset.dir); return; }
+      var file = e.target.closest("[data-file]");
+      if (file) loadFileContent(file.dataset.file);
     });
 
-    // --- Files: Transfer ---
+    // Transfer
     $("#btn-transfer").addEventListener("click", openTransferModal);
-    $("#transfer-close").addEventListener("click", function () { $("#transfer-modal").classList.add("hidden"); });
-    $("#transfer-cancel").addEventListener("click", function () { $("#transfer-modal").classList.add("hidden"); });
-    $("#transfer-modal").addEventListener("click", function (e) {
-      if (e.target === this) this.classList.add("hidden");
+    $("#transfer-close").addEventListener("click", function() { $("#transfer-modal").classList.add("hidden"); });
+    $("#transfer-cancel").addEventListener("click", function() { $("#transfer-modal").classList.add("hidden"); });
+    $("#transfer-modal").addEventListener("click", function(e) {
+      if (e.target === e.currentTarget) e.target.classList.add("hidden");
     });
     $("#transfer-submit").addEventListener("click", submitTransfer);
 
-    // --- Editor modal ---
-    $("#editor-save").addEventListener("click", function () {
+    // Editor modal
+    $("#editor-save").addEventListener("click", function() {
       saveFile(editorFilePath, $("#editor-content").value);
     });
-    $("#editor-cancel").addEventListener("click", function () {
-      $("#editor-modal").classList.add("hidden");
-    });
-    $("#editor-close").addEventListener("click", function () {
-      $("#editor-modal").classList.add("hidden");
-    });
-    $("#editor-modal").addEventListener("click", function (e) {
-      if (e.target === this) this.classList.add("hidden");
+    $("#editor-cancel").addEventListener("click", function() { $("#editor-modal").classList.add("hidden"); });
+    $("#editor-close").addEventListener("click", function() { $("#editor-modal").classList.add("hidden"); });
+    $("#editor-modal").addEventListener("click", function(e) {
+      if (e.target === e.currentTarget) e.target.classList.add("hidden");
     });
 
-    // --- Terminal ---
-    const termInput = $("#terminal-input");
-    termInput.addEventListener("keydown", function (e) {
+    // Terminal input
+    $("#terminal-input").addEventListener("keydown", function(e) {
       if (e.key === "Enter") {
-        const cmd = this.value;
+        var cmd = this.value;
         this.value = "";
         runCommand(cmd);
       } else if (e.key === "ArrowUp") {
@@ -1298,37 +1365,26 @@
       }
     });
 
-    // --- Updates ---
+    // Updates
     $("#btn-check-updates").addEventListener("click", checkUpdates);
     $("#btn-install-updates").addEventListener("click", installUpdates);
 
-    // --- Logs ---
-    $("#btn-refresh-logs").addEventListener("click", function () {
-      loadLogs($("#logs-service").value);
-    });
-    $("#logs-service").addEventListener("change", function () {
-      loadLogs(this.value);
-    });
-    $("#logs-lines").addEventListener("change", function () {
-      loadLogs($("#logs-service").value);
-    });
+    // Logs
+    $("#btn-refresh-logs").addEventListener("click", function() { loadLogs($("#logs-service").value); });
+    $("#logs-service").addEventListener("change", function() { loadLogs(this.value); });
+    $("#logs-lines").addEventListener("change", function() { loadLogs($("#logs-service").value); });
 
-    // --- Keyboard: Escape closes modals ---
-    document.addEventListener("keydown", function (e) {
+    // Escape closes modals
+    document.addEventListener("keydown", function(e) {
       if (e.key === "Escape") {
-        $("#editor-modal").classList.add("hidden");
-        $("#transfer-modal").classList.add("hidden");
-        $("#machines-modal").classList.add("hidden");
-        $("#add-machine-modal").classList.add("hidden");
+        $$(".modal-overlay").forEach(function(m) { m.classList.add("hidden"); });
       }
     });
 
-    // --- Initialization ---
-    loadMachines().then(function () {
+    // Initial load
+    loadMachines().then(function() {
       switchSection("monitoring");
     });
-
-    // Refresh machine statuses every 30 seconds
     statusTimer = setInterval(refreshMachineStatuses, 30000);
   }
 

@@ -176,6 +176,10 @@
     selectedMachineId = id;
     var m = selectedMachine();
     $("#current-machine-name").textContent = m ? m.icon + " " + m.name : "All machines";
+    // Reset file path to machine's default
+    currentFilePath = m ? (m.default_path || "/") : null;
+    // Reset terminal cwd
+    terminalCwd = null;
     renderMachineSelector();
     loadSection(currentSection);
   }
@@ -1799,7 +1803,7 @@
     $("#btn-refresh-logs").addEventListener("click", refreshLogs);
 
     // -- Files --
-    $("#btn-transfer").addEventListener("click", openTransferModal);
+    $("#btn-transfer").addEventListener("click", function () { openTransferModal(); });
     $("#transfer-close").addEventListener("click", function () { $("#transfer-modal").classList.add("hidden"); });
     $("#transfer-cancel").addEventListener("click", function () { $("#transfer-modal").classList.add("hidden"); });
     $("#transfer-submit").addEventListener("click", executeTransfer);

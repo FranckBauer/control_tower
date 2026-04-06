@@ -203,7 +203,8 @@ async def _async_run_powershell(cmd: str, timeout: int = 10) -> dict:
     """Run a PowerShell command asynchronously (Windows only)."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            "powershell.exe", "-NoProfile", "-Command", cmd,
+            "powershell.exe", "-NoProfile", "-OutputFormat", "Text", "-Command",
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; " + cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -461,7 +462,7 @@ async def get_services():
     if IS_WINDOWS:
         # List all real Windows services via PowerShell (fast, with description)
         result = await _async_run_powershell(
-            "Get-Service | Select-Object Name, DisplayName, Status, StartType | ConvertTo-Json -Compress",
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Service | Select-Object Name, DisplayName, Status, StartType | ConvertTo-Json -Compress -Depth 1",
             timeout=15
         )
         services = []

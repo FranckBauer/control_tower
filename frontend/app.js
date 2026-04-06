@@ -602,12 +602,39 @@
         return;
       }
 
+      // Add search/filter input above table
+      var existingFilter = card.querySelector(".services-filter");
+      if (!existingFilter) {
+        var filterDiv = document.createElement("div");
+        filterDiv.className = "services-filter";
+        filterDiv.style.cssText = "padding:0 0 12px;display:flex;gap:10px;align-items:center";
+        filterDiv.innerHTML =
+          '<input type="text" id="services-search" placeholder="Filter services..." style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius);font-size:0.85rem">' +
+          '<span style="font-size:0.8rem;color:var(--text-muted)">' + services.length + ' services</span>';
+        card.querySelector(".table-wrap").insertBefore(filterDiv, card.querySelector("table"));
+        // Filter handler
+        filterDiv.querySelector("#services-search").addEventListener("input", function () {
+          var query = this.value.toLowerCase();
+          body.querySelectorAll("tr").forEach(function (row) {
+            var text = row.textContent.toLowerCase();
+            row.style.display = text.includes(query) ? "" : "none";
+          });
+        });
+      }
+
       services.forEach(function (svc) {
         var tr = document.createElement("tr");
 
+        // Detect noteworthy: running + manual boot (possibly user-started or third-party)
+        var isNoteworthy = svc.active === "active" && svc.enabled === "manual";
+
         // Name
         var tdName = document.createElement("td");
-        tdName.innerHTML = '<span style="font-family:var(--font-mono);font-weight:500">' + escapeHtml(svc.name) + '</span>';
+        var nameHtml = '<span style="font-family:var(--font-mono);font-weight:500">' + escapeHtml(svc.name) + '</span>';
+        if (isNoteworthy) {
+          nameHtml += ' <span title="Running but not set to auto-start" style="color:var(--warning);font-size:0.75rem">&#9888;</span>';
+        }
+        tdName.innerHTML = nameHtml;
         tr.appendChild(tdName);
 
         // Description

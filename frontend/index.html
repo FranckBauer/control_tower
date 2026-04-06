@@ -261,7 +261,7 @@
 
   <!-- Transfer Modal -->
   <div class="modal-overlay hidden" id="transfer-modal">
-    <div class="modal modal-sm">
+    <div class="modal" style="max-width:700px">
       <div class="modal-header">
         <h3 class="modal-title">Transfer File</h3>
         <button class="modal-close" id="transfer-close">&times;</button>
@@ -269,7 +269,14 @@
       <div class="modal-body">
         <div class="form-group"><label class="form-label">Source file</label><input type="text" class="form-input" id="transfer-source" readonly></div>
         <div class="form-group"><label class="form-label">Destination machine</label><select class="form-input" id="transfer-dest-machine"></select></div>
-        <div class="form-group"><label class="form-label">Destination path</label><input type="text" class="form-input" id="transfer-dest-path" placeholder="/home/pi/"></div>
+        <div class="form-group">
+          <label class="form-label">Destination path</label>
+          <input type="text" class="form-input" id="transfer-dest-path" placeholder="/home/pi/">
+          <div class="transfer-browser" id="transfer-browser">
+            <div class="transfer-browser-breadcrumbs" id="transfer-browser-breadcrumbs"></div>
+            <div class="transfer-browser-list" id="transfer-browser-list"></div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="transfer-submit">Transfer</button>

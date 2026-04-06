@@ -1607,6 +1607,8 @@
   /* ---------------------------------------------------------------
      File Transfer
      --------------------------------------------------------------- */
+  var transferBrowserPath = null;
+
   function openTransferModal(filePath) {
     var sourcePath = filePath || currentFilePath;
     if (!sourcePath) {
@@ -1626,7 +1628,88 @@
     });
 
     $("#transfer-source").value = sourcePath;
+    $("#transfer-dest-path").value = "";
     $("#transfer-modal").classList.remove("hidden");
+
+    // Load dest browser for default machine
+    var destId = select.value;
+    if (destId) {
+      var destM = getMachine(destId);
+      var startPath = destM ? (destM.default_path || "/") : "/";
+      loadTransferBrowser(destId, startPath);
+    }
+
+    // On machine change, reload browser
+    if (!select._transferBound) {
+      select._transferBound = true;
+      select.addEventListener("change", function () {
+        var dm = getMachine(this.value);
+        var sp = dm ? (dm.default_path || "/") : "/";
+        loadTransferBrowser(this.value, sp);
+      });
+    }
+  }
+
+  async function loadTransferBrowser(machineId, path) {
+    var list = $("#transfer-browser-list");
+    var breadcrumbs = $("#transfer-browser-breadcrumbs");
+    transferBrowserPath = path;
+    $("#transfer-dest-path").value = path;
+
+    list.innerHTML = '<div style="padding:10px;color:var(--text-muted);font-size:0.8rem">Loading...</div>';
+
+    // Breadcrumbs
+    var sep = pathSeparator(path);
+    var parts = pathParts(path);
+    var bcHtml = '';
+    if (sep === "\\") {
+      bcHtml += '<span class="bc-link" data-tbpath="' + escapeHtml(parts[0] || "C:\\") + '">' + escapeHtml(parts[0] || "C:\\") + '</span>';
+      var acc = parts[0] || "C:\\";
+      for (var i = 1; i < parts.length; i++) {
+        acc += parts[i] + (i < parts.length - 1 ? sep : "");
+        bcHtml += '<span class="bc-sep"> \\ </span><span class="bc-link" data-tbpath="' + escapeHtml(acc) + '">' + escapeHtml(parts[i]) + '</span>';
+      }
+    } else {
+      bcHtml += '<span class="bc-link" data-tbpath="/">/</span>';
+      var acc = "";
+      for (var i = 0; i < parts.length; i++) {
+        acc += "/" + parts[i];
+        bcHtml += '<span class="bc-sep"> / </span><span class="bc-link" data-tbpath="' + escapeHtml(acc) + '">' + escapeHtml(parts[i]) + '</span>';
+      }
+    }
+    breadcrumbs.innerHTML = bcHtml;
+
+    // Breadcrumb clicks
+    breadcrumbs.querySelectorAll(".bc-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        loadTransferBrowser(machineId, link.dataset.tbpath);
+      });
+    });
+
+    try {
+      var data = await api("/api/m/" + machineId + "/files?path=" + encodeURIComponent(path));
+      var entries = data.entries || [];
+      var dirs = entries.filter(function (e) { return e.is_dir; });
+
+      if (dirs.length === 0) {
+        list.innerHTML = '<div style="padding:10px;color:var(--text-muted);font-size:0.8rem">No subdirectories</div>';
+        return;
+      }
+
+      list.innerHTML = "";
+      dirs.forEach(function (dir) {
+        var dirPath = pathJoin(path, dir.name);
+        var item = document.createElement("div");
+        item.className = "transfer-browser-item";
+        item.innerHTML = '<span class="folder-icon">&#128193;</span><span>' + escapeHtml(dir.name) + '</span>';
+        item.addEventListener("click", function () {
+          loadTransferBrowser(machineId, dirPath);
+        });
+        list.appendChild(item);
+      });
+    } catch (err) {
+      list.innerHTML = '<div style="padding:10px;color:var(--danger);font-size:0.8rem">' + escapeHtml(err.message) + '</div>';
+    }
   }
 
   async function executeTransfer() {

@@ -1120,6 +1120,47 @@ tr:hover td { background: rgba(255,255,255,0.015); }
   border-top: 1px solid var(--border);
 }
 
+/* --- Transfer Browser --- */
+.transfer-browser {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  max-height: 250px;
+  overflow-y: auto;
+}
+.transfer-browser-breadcrumbs {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+.transfer-browser-breadcrumbs .bc-link {
+  color: var(--accent-light);
+  cursor: pointer;
+}
+.transfer-browser-breadcrumbs .bc-link:hover { text-decoration: underline; }
+.transfer-browser-breadcrumbs .bc-sep { color: var(--text-dim); }
+.transfer-browser-list {}
+.transfer-browser-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.transfer-browser-item:hover { background: var(--bg-hover); }
+.transfer-browser-item.selected { background: var(--accent-glow); }
+.transfer-browser-item .folder-icon { font-size: 1rem; }
+
 .editor-textarea {
   flex: 1;
   width: 100%;

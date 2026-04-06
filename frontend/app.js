@@ -230,60 +230,75 @@
   /* ---------------------------------------------------------------
      MONITORING
      --------------------------------------------------------------- */
+  function renderMonitoringContent(content, results) {
+    var html = '<div class="overview-grid">';
+    results.forEach(function (r) {
+      html += buildOverviewCard(r.machine, r.data);
+    });
+    html += '</div>';
+    content.innerHTML = html;
+
+    content.querySelectorAll(".overview-card").forEach(function (card) {
+      card.addEventListener("click", function () {
+        selectMachine(card.dataset.machineId);
+      });
+    });
+
+    content.querySelectorAll("[data-gauge-value]").forEach(function (el) {
+      el.style.setProperty("--gauge-value", el.dataset.gaugeValue);
+      el.style.setProperty("--gauge-color", el.dataset.gaugeColor);
+    });
+  }
+
+  function renderSingleMonitoring(content, data) {
+    content.innerHTML = buildSingleMachineView(data);
+    content.querySelectorAll("[data-gauge-value]").forEach(function (el) {
+      el.style.setProperty("--gauge-value", el.dataset.gaugeValue);
+      el.style.setProperty("--gauge-color", el.dataset.gaugeColor);
+    });
+  }
+
+  async function fetchAllSystems() {
+    return Promise.all(machines.map(function (m) {
+      if (m.status === "online") {
+        return api("/api/m/" + m.id + "/system").then(function (data) {
+          monitoringCache[m.id] = data;
+          return { machine: m, data: data };
+        }).catch(function () {
+          return { machine: m, data: null };
+        });
+      }
+      return Promise.resolve({ machine: m, data: null });
+    }));
+  }
+
   async function loadMonitoring() {
     var content = $("#monitoring-content");
     var badge = $("#monitoring-machine-count");
+    var isFirstLoad = !content.querySelector(".overview-grid") && !content.querySelector(".metric-grid");
 
     if (selectedMachineId === null) {
-      // === ALL MACHINES OVERVIEW ===
       badge.textContent = machines.length + " machines";
-      content.innerHTML = '<div class="loading-indicator">Loading machines...</div>';
 
-      var html = '<div class="overview-grid">';
-      // Fetch system info for all online machines in parallel
-      var promises = machines.map(function (m) {
-        if (m.status === "online") {
-          return api("/api/m/" + m.id + "/system").then(function (data) {
-            monitoringCache[m.id] = data;
-            return { machine: m, data: data };
-          }).catch(function () {
-            return { machine: m, data: null };
-          });
-        }
-        return Promise.resolve({ machine: m, data: null });
-      });
+      if (isFirstLoad) {
+        content.innerHTML = '<div class="loading-indicator">Loading machines...</div>';
+      }
 
-      var results = await Promise.all(promises);
+      var results = await fetchAllSystems();
+      renderMonitoringContent(content, results);
 
-      html = '<div class="overview-grid">';
-      results.forEach(function (r) {
-        html += buildOverviewCard(r.machine, r.data);
-      });
-      html += '</div>';
-      content.innerHTML = html;
-
-      // Attach click handlers
-      content.querySelectorAll(".overview-card").forEach(function (card) {
-        card.addEventListener("click", function () {
-          selectMachine(card.dataset.machineId);
-        });
-      });
-
-      // Set gauge CSS variables
-      content.querySelectorAll("[data-gauge-value]").forEach(function (el) {
-        el.style.setProperty("--gauge-value", el.dataset.gaugeValue);
-        el.style.setProperty("--gauge-color", el.dataset.gaugeColor);
-      });
-
-      // Auto-refresh every 15 seconds
-      refreshTimer = setInterval(function () {
-        if (currentSection === "monitoring" && selectedMachineId === null) {
-          loadMonitoring();
-        }
-      }, 15000);
+      // Auto-refresh — only set if not already set
+      if (!refreshTimer) {
+        refreshTimer = setInterval(function () {
+          if (currentSection === "monitoring" && selectedMachineId === null) {
+            fetchAllSystems().then(function (results) {
+              renderMonitoringContent(content, results);
+            });
+          }
+        }, 15000);
+      }
 
     } else {
-      // === SINGLE MACHINE DETAIL ===
       var m = selectedMachine();
       badge.textContent = m ? m.name : "";
 
@@ -292,33 +307,26 @@
         return;
       }
 
-      content.innerHTML = '<div class="loading-indicator">Loading system data...</div>';
+      if (isFirstLoad) {
+        content.innerHTML = '<div class="loading-indicator">Loading system data...</div>';
+      }
 
       try {
         var data = await api("/api/m/" + m.id + "/system");
         monitoringCache[m.id] = data;
-        content.innerHTML = buildSingleMachineView(data);
+        renderSingleMonitoring(content, data);
 
-        // Set gauge CSS variables
-        content.querySelectorAll("[data-gauge-value]").forEach(function (el) {
-          el.style.setProperty("--gauge-value", el.dataset.gaugeValue);
-          el.style.setProperty("--gauge-color", el.dataset.gaugeColor);
-        });
-
-        // Auto-refresh every 10 seconds
-        refreshTimer = setInterval(async function () {
-          if (currentSection === "monitoring" && selectedMachineId === m.id) {
-            try {
-              var fresh = await api("/api/m/" + m.id + "/system");
-              monitoringCache[m.id] = fresh;
-              content.innerHTML = buildSingleMachineView(fresh);
-              content.querySelectorAll("[data-gauge-value]").forEach(function (el) {
-                el.style.setProperty("--gauge-value", el.dataset.gaugeValue);
-                el.style.setProperty("--gauge-color", el.dataset.gaugeColor);
-              });
-            } catch (e) { /* silent */ }
-          }
-        }, 10000);
+        if (!refreshTimer) {
+          var machineId = m.id;
+          refreshTimer = setInterval(function () {
+            if (currentSection === "monitoring" && selectedMachineId === machineId) {
+              api("/api/m/" + machineId + "/system").then(function (fresh) {
+                monitoringCache[machineId] = fresh;
+                renderSingleMonitoring(content, fresh);
+              }).catch(function () {});
+            }
+          }, 10000);
+        }
 
       } catch (err) {
         content.innerHTML = '<div class="select-machine-msg">Failed to load system data: ' + escapeHtml(err.message) + '</div>';
@@ -351,8 +359,6 @@
     html += buildMiniGauge(diskPct, "%", "DISK", gaugeColor(diskPct));
     if (temp != null) {
       html += buildMiniGauge(Math.round(temp), "\u00B0C", "TEMP", tempColor(temp));
-    } else {
-      html += buildMiniGauge("--", "", "TEMP", "#30363d");
     }
     html += '</div>';
 
@@ -407,11 +413,9 @@
       : "";
     html += buildMetricCard(diskPct, "%", "Disk", gaugeColor(diskPct), diskSubtitle);
 
-    // Temp Card
+    // Temp Card (only if available)
     if (temp != null) {
       html += buildMetricCard(Math.round(temp), "\u00B0C", "Temperature", tempColor(temp), "CPU thermal zone");
-    } else {
-      html += buildMetricCard("--", "", "Temperature", "#30363d", "Not available");
     }
 
     html += '</div>';

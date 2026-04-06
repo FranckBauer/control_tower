@@ -750,10 +750,14 @@ async def run_terminal_command(body: TerminalCommand):
 async def update_check():
     if IS_WINDOWS:
         result = await _async_run_powershell(
-            "winget upgrade --include-unknown", timeout=60
+            "winget upgrade --include-unknown", timeout=120
         )
     else:
-        result = await _async_run("sudo apt update 2>&1", timeout=60)
+        # Try sudo first, fall back to apt list --upgradable if sudo fails
+        result = await _async_run("sudo -n apt update 2>&1", timeout=60)
+        if result["returncode"] != 0 and "password" in result["stderr"].lower():
+            # No sudo access — use non-privileged check
+            result = await _async_run("apt list --upgradable 2>/dev/null", timeout=30)
 
     return {
         "output": result["stdout"] + result["stderr"],
@@ -769,7 +773,12 @@ async def update_upgrade():
             timeout=600,
         )
     else:
-        result = await _async_run("sudo apt upgrade -y 2>&1", timeout=600)
+        result = await _async_run("sudo -n apt upgrade -y 2>&1", timeout=600)
+        if result["returncode"] != 0 and "password" in result["stderr"].lower():
+            return {
+                "output": "sudo requires a password. Configure passwordless sudo for apt or run the agent as root.",
+                "success": False,
+            }
 
     return {
         "output": result["stdout"] + result["stderr"],

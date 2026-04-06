@@ -1139,12 +1139,20 @@
           tr.innerHTML =
             '<td><span class="file-link dir" data-path="' + escapeHtml(entryPath) + '"><span class="file-icon">&#128193;</span>' + escapeHtml(entry.name) + '</span></td>' +
             '<td class="col-size">--</td>' +
-            '<td class="col-modified">' + formatDate(entry.modified) + '</td>';
+            '<td class="col-modified">' + formatDate(entry.modified) + '</td>' +
+            '<td class="col-actions"></td>';
         } else {
           tr.innerHTML =
             '<td><span class="file-link" data-file="' + escapeHtml(entryPath) + '"><span class="file-icon">&#128196;</span>' + escapeHtml(entry.name) + '</span></td>' +
             '<td class="col-size">' + (entry.size != null ? formatBytes(entry.size) : "") + '</td>' +
-            '<td class="col-modified">' + formatDate(entry.modified) + '</td>';
+            '<td class="col-modified">' + formatDate(entry.modified) + '</td>' +
+            '<td class="col-actions">' +
+              '<div class="btn-group">' +
+              '<button class="btn btn-xs" data-edit-file="' + escapeHtml(entryPath) + '" title="Edit">Edit</button>' +
+              '<button class="btn btn-xs" data-download-file="' + escapeHtml(entryPath) + '" title="Download">&#8595;</button>' +
+              '<button class="btn btn-xs" data-transfer-file="' + escapeHtml(entryPath) + '" title="Transfer to another machine">&#8594;</button>' +
+              '</div>' +
+            '</td>';
         }
         body.appendChild(tr);
       });
@@ -1156,10 +1164,38 @@
         });
       });
 
-      // Click handlers for files
+      // Click handlers for file names (open editor)
       body.querySelectorAll("[data-file]").forEach(function (el) {
         el.addEventListener("click", function () {
           openFileEditor(el.dataset.file);
+        });
+      });
+
+      // Edit buttons
+      body.querySelectorAll("[data-edit-file]").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          openFileEditor(btn.dataset.editFile);
+        });
+      });
+
+      // Download buttons
+      body.querySelectorAll("[data-download-file]").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var filePath = btn.dataset.downloadFile;
+          var m = selectedMachine();
+          if (!m) return;
+          // Open download in new tab
+          window.open("/api/m/" + m.id + "/files/download?path=" + encodeURIComponent(filePath), "_blank");
+        });
+      });
+
+      // Transfer buttons (per file)
+      body.querySelectorAll("[data-transfer-file]").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          openTransferModal(btn.dataset.transferFile);
         });
       });
 
@@ -1567,8 +1603,9 @@
   /* ---------------------------------------------------------------
      File Transfer
      --------------------------------------------------------------- */
-  function openTransferModal() {
-    if (!currentFilePath) {
+  function openTransferModal(filePath) {
+    var sourcePath = filePath || currentFilePath;
+    if (!sourcePath) {
       toast("No file selected for transfer", "error");
       return;
     }
@@ -1584,7 +1621,7 @@
       }
     });
 
-    $("#transfer-source").value = currentFilePath;
+    $("#transfer-source").value = sourcePath;
     $("#transfer-modal").classList.remove("hidden");
   }
 

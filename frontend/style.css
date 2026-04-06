@@ -685,6 +685,7 @@ tr:hover td { background: rgba(255,255,255,0.015); }
 
 .col-size { width: 100px; text-align: right; }
 .col-modified { width: 180px; }
+.col-actions { width: 140px; text-align: right; }
 
 /* --- Status Pills --- */
 .pill {

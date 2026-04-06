@@ -602,30 +602,89 @@
         return;
       }
 
-      // Add search/filter input above table
+      // Build filter bar
       var existingFilter = card.querySelector(".services-filter");
-      if (!existingFilter) {
-        var filterDiv = document.createElement("div");
-        filterDiv.className = "services-filter";
-        filterDiv.style.cssText = "padding:0 0 12px;display:flex;gap:10px;align-items:center";
-        filterDiv.innerHTML =
-          '<input type="text" id="services-search" placeholder="Filter services..." style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius);font-size:0.85rem">' +
-          '<span style="font-size:0.8rem;color:var(--text-muted)">' + services.length + ' services</span>';
-        card.querySelector(".table-wrap").insertBefore(filterDiv, card.querySelector("table"));
-        // Filter handler
-        filterDiv.querySelector("#services-search").addEventListener("input", function () {
-          var query = this.value.toLowerCase();
-          body.querySelectorAll("tr").forEach(function (row) {
-            var text = row.textContent.toLowerCase();
-            row.style.display = text.includes(query) ? "" : "none";
-          });
+      if (existingFilter) existingFilter.remove();
+
+      // Collect unique values for each filterable column
+      var types = {}, statuses = {}, boots = {};
+      services.forEach(function (s) {
+        var t = s.category || "system"; types[t] = (types[t] || 0) + 1;
+        var st = s.active === "active" ? "running" : s.active === "inactive" ? "stopped" : s.active; statuses[st] = (statuses[st] || 0) + 1;
+        var b = s.enabled || "-"; boots[b] = (boots[b] || 0) + 1;
+      });
+
+      var activeFilters = { type: null, status: null, boot: null };
+
+      function buildFilterPills(values, filterKey) {
+        var html = '';
+        Object.keys(values).sort().forEach(function (val) {
+          html += '<span class="filter-pill" data-filter-key="' + filterKey + '" data-filter-val="' + escapeHtml(val) + '">' + escapeHtml(val) + ' <small>(' + values[val] + ')</small></span>';
         });
+        return html;
       }
+
+      var filterDiv = document.createElement("div");
+      filterDiv.className = "services-filter";
+      filterDiv.innerHTML =
+        '<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">' +
+          '<input type="text" id="services-search" placeholder="Search..." style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius);font-size:0.85rem">' +
+          '<span id="services-count" style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap">' + services.length + ' / ' + services.length + '</span>' +
+        '</div>' +
+        '<div class="filter-row"><span class="filter-label">Type:</span>' + buildFilterPills(types, "type") + '</div>' +
+        '<div class="filter-row"><span class="filter-label">Status:</span>' + buildFilterPills(statuses, "status") + '</div>' +
+        '<div class="filter-row"><span class="filter-label">Boot:</span>' + buildFilterPills(boots, "boot") + '</div>';
+
+      card.querySelector(".table-wrap").insertBefore(filterDiv, card.querySelector("table"));
+
+      function applyFilters() {
+        var query = (document.getElementById("services-search").value || "").toLowerCase();
+        var visible = 0;
+        body.querySelectorAll("tr").forEach(function (row) {
+          var text = row.textContent.toLowerCase();
+          var typeVal = row.dataset.type || "";
+          var statusVal = row.dataset.status || "";
+          var bootVal = row.dataset.boot || "";
+          var matchText = !query || text.includes(query);
+          var matchType = !activeFilters.type || typeVal === activeFilters.type;
+          var matchStatus = !activeFilters.status || statusVal === activeFilters.status;
+          var matchBoot = !activeFilters.boot || bootVal === activeFilters.boot;
+          var show = matchText && matchType && matchStatus && matchBoot;
+          row.style.display = show ? "" : "none";
+          if (show) visible++;
+        });
+        document.getElementById("services-count").textContent = visible + " / " + services.length;
+      }
+
+      // Search handler
+      filterDiv.querySelector("#services-search").addEventListener("input", applyFilters);
+
+      // Filter pill click handlers
+      filterDiv.querySelectorAll(".filter-pill").forEach(function (pill) {
+        pill.addEventListener("click", function () {
+          var key = pill.dataset.filterKey;
+          var val = pill.dataset.filterVal;
+          // Toggle: if already active, deactivate
+          if (activeFilters[key] === val) {
+            activeFilters[key] = null;
+            pill.classList.remove("active");
+          } else {
+            // Deactivate siblings
+            filterDiv.querySelectorAll('.filter-pill[data-filter-key="' + key + '"]').forEach(function (p) { p.classList.remove("active"); });
+            activeFilters[key] = val;
+            pill.classList.add("active");
+          }
+          applyFilters();
+        });
+      });
 
       services.forEach(function (svc) {
         var tr = document.createElement("tr");
-
         var isThirdParty = svc.category === "third-party";
+        var statusLabel = svc.active === "active" ? "running" : svc.active === "inactive" ? "stopped" : svc.active;
+        tr.dataset.type = svc.category || "system";
+        tr.dataset.status = statusLabel;
+        tr.dataset.boot = svc.enabled || "-";
 
         // Name
         var tdName = document.createElement("td");

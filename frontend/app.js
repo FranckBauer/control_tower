@@ -626,6 +626,18 @@
         var b = s.enabled || "-"; colValues.boot[b] = (colValues.boot[b] || 0) + 1;
       });
 
+      // Display labels for filter values
+      var filterLabels = {
+        "third-party": "tiers",
+        "system": "system",
+        "running": "running",
+        "stopped": "stopped",
+        "enabled": "enabled",
+        "manual": "manual",
+        "disabled": "disabled",
+        "static": "static",
+      };
+
       // Build dropdown content for each filterable column header
       ["type", "status", "boot"].forEach(function (col) {
         var dropdown = document.getElementById("filter-" + col);
@@ -633,7 +645,8 @@
         var vals = colValues[col];
         var html = '';
         Object.keys(vals).sort().forEach(function (val) {
-          html += '<div class="col-filter-item" data-val="' + escapeHtml(val) + '"><span class="check"></span><span>' + escapeHtml(val) + '</span><span class="count">' + vals[val] + '</span></div>';
+          var label = filterLabels[val] || val;
+          html += '<div class="col-filter-item" data-val="' + escapeHtml(val) + '"><span class="check"></span><span>' + escapeHtml(label) + '</span><span class="count">' + vals[val] + '</span></div>';
         });
         html += '<div class="col-filter-clear">Clear filter</div>';
         dropdown.innerHTML = html;

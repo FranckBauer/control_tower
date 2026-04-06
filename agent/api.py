@@ -394,6 +394,32 @@ async def get_network_info():
 
     io = psutil.net_io_counters()
 
+    # Per-interface IO stats
+    per_iface_io = {}
+    try:
+        iface_io = psutil.net_io_counters(pernic=True)
+        for name, counters in iface_io.items():
+            per_iface_io[name] = {
+                "bytes_sent": counters.bytes_sent,
+                "bytes_recv": counters.bytes_recv,
+                "packets_sent": counters.packets_sent,
+                "packets_recv": counters.packets_recv,
+            }
+    except Exception:
+        pass
+
+    # Enrich interfaces with IO stats and status
+    iface_stats = psutil.net_if_stats()
+    for iface in interfaces:
+        name = iface["name"]
+        if name in per_iface_io:
+            iface["io"] = per_iface_io[name]
+        stats = iface_stats.get(name)
+        if stats:
+            iface["is_up"] = stats.isup
+            iface["speed"] = stats.speed  # Mbps
+            iface["mtu"] = stats.mtu
+
     return {
         "interfaces": interfaces,
         "connections": connections,
@@ -404,6 +430,32 @@ async def get_network_info():
             "packets_recv": io.packets_recv,
         },
     }
+
+
+@router.get("/api/connections")
+async def get_connections(limit: int = 50):
+    """List active network connections."""
+    conns = []
+    try:
+        for c in psutil.net_connections(kind="inet"):
+            if c.status == "NONE":
+                continue
+            local = f"{c.laddr.ip}:{c.laddr.port}" if c.laddr else ""
+            remote = f"{c.raddr.ip}:{c.raddr.port}" if c.raddr else ""
+            conns.append({
+                "type": "TCP" if c.type.name == "SOCK_STREAM" else "UDP",
+                "local": local,
+                "remote": remote,
+                "status": c.status,
+                "pid": c.pid,
+            })
+    except (psutil.AccessDenied, PermissionError, OSError):
+        pass
+
+    # Sort: ESTABLISHED first, then by status
+    status_order = {"ESTABLISHED": 0, "LISTEN": 1, "TIME_WAIT": 2, "CLOSE_WAIT": 3}
+    conns.sort(key=lambda c: (status_order.get(c["status"], 9), c["status"]))
+    return {"connections": conns[:limit], "total": len(conns)}
 
 
 # ---------------------------------------------------------------------------

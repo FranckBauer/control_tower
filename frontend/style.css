@@ -611,6 +611,47 @@ main {
   margin-top: 2px;
 }
 
+.stat-card-desc {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.stat-card.clickable:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.net-section-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 24px 0 12px;
+  font-weight: 600;
+}
+
+.iface-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.iface-io {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 /* --- Tables --- */
 .table-wrap { overflow-x: auto; }
 

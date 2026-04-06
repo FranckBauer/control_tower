@@ -847,6 +847,8 @@
   /* ---------------------------------------------------------------
      NETWORK
      --------------------------------------------------------------- */
+  var networkData = null; // cached for detail panels
+
   async function loadNetwork() {
     var selectMsg = $("#network-select-msg");
     var content = $("#network-content");
@@ -876,49 +878,152 @@
 
     try {
       var data = await api("/api/m/" + m.id + "/network");
+      networkData = data;
 
-      // Stats cards
+      // Stat cards — clickable
       stats.innerHTML =
-        '<div class="stat-card"><div class="stat-card-label">Connections</div><div class="stat-card-value">' + formatNumber(data.connections) + '</div></div>' +
-        '<div class="stat-card"><div class="stat-card-label">Interfaces</div><div class="stat-card-value">' + (data.interfaces ? data.interfaces.length : 0) + '</div></div>' +
-        '<div class="stat-card"><div class="stat-card-label">Data Sent</div><div class="stat-card-value">' + formatBytes(data.io ? data.io.bytes_sent : 0) + '</div></div>' +
-        '<div class="stat-card"><div class="stat-card-label">Data Received</div><div class="stat-card-value">' + formatBytes(data.io ? data.io.bytes_recv : 0) + '</div></div>';
+        '<div class="stat-card clickable" data-net-detail="connections">' +
+          '<div class="stat-card-label">Active connections</div>' +
+          '<div class="stat-card-value">' + formatNumber(data.connections) + '</div>' +
+          '<div class="stat-card-desc">TCP/UDP connections currently open</div>' +
+        '</div>' +
+        '<div class="stat-card clickable" data-net-detail="interfaces">' +
+          '<div class="stat-card-label">Network interfaces</div>' +
+          '<div class="stat-card-value">' + (data.interfaces ? data.interfaces.length : 0) + '</div>' +
+          '<div class="stat-card-desc">Physical and virtual adapters</div>' +
+        '</div>' +
+        '<div class="stat-card">' +
+          '<div class="stat-card-label">Total sent</div>' +
+          '<div class="stat-card-value">' + formatBytes(data.io ? data.io.bytes_sent : 0) + '</div>' +
+          '<div class="stat-card-desc">Cumulative since boot</div>' +
+        '</div>' +
+        '<div class="stat-card">' +
+          '<div class="stat-card-label">Total received</div>' +
+          '<div class="stat-card-value">' + formatBytes(data.io ? data.io.bytes_recv : 0) + '</div>' +
+          '<div class="stat-card-desc">Cumulative since boot</div>' +
+        '</div>';
 
-      // Interfaces
+      // Interfaces — enriched with stats
       if (data.interfaces && data.interfaces.length > 0) {
-        var ifHtml = '<div class="iface-grid">';
+        var ifHtml = '<h3 class="net-section-title">Interfaces</h3><div class="iface-grid">';
         data.interfaces.forEach(function (iface) {
+          var statusClass = iface.is_up ? "pill-green" : "pill-red";
+          var statusText = iface.is_up ? "UP" : "DOWN";
           ifHtml += '<div class="iface-card">';
-          ifHtml += '<div class="iface-name">' + escapeHtml(iface.name) + '</div>';
+          ifHtml += '<div class="iface-header"><span class="iface-name">' + escapeHtml(iface.name) + '</span><span class="pill ' + statusClass + '">' + statusText + '</span></div>';
           if (iface.addresses) {
             iface.addresses.forEach(function (addr) {
-              ifHtml += '<div class="iface-addr"><span class="label">IP:</span> ' + escapeHtml(addr.ip) + '</div>';
+              ifHtml += '<div class="iface-addr"><span class="label">IP</span><span class="value">' + escapeHtml(addr.ip) + '</span></div>';
               if (addr.netmask) {
-                ifHtml += '<div class="iface-addr"><span class="label">Mask:</span> ' + escapeHtml(addr.netmask) + '</div>';
+                ifHtml += '<div class="iface-addr"><span class="label">Mask</span><span class="value">' + escapeHtml(addr.netmask) + '</span></div>';
               }
             });
+          }
+          if (iface.speed) ifHtml += '<div class="iface-addr"><span class="label">Speed</span><span class="value">' + iface.speed + ' Mbps</span></div>';
+          if (iface.mtu) ifHtml += '<div class="iface-addr"><span class="label">MTU</span><span class="value">' + iface.mtu + '</span></div>';
+          if (iface.io) {
+            ifHtml += '<div class="iface-io">';
+            ifHtml += '<span title="Sent">&uarr; ' + formatBytes(iface.io.bytes_sent) + '</span>';
+            ifHtml += '<span title="Received">&darr; ' + formatBytes(iface.io.bytes_recv) + '</span>';
+            ifHtml += '</div>';
           }
           ifHtml += '</div>';
         });
         ifHtml += '</div>';
         ifaces.innerHTML = ifHtml;
-      } else {
-        ifaces.innerHTML = '<div class="select-machine-msg">No network interfaces found.</div>';
       }
 
-      // Traffic
+      // Traffic summary
       if (data.io) {
         traffic.innerHTML =
+          '<h3 class="net-section-title">Traffic totals</h3>' +
           '<div class="traffic-grid">' +
-          '<div class="traffic-item"><div class="traffic-label">Bytes Sent</div><div class="traffic-value">' + formatBytes(data.io.bytes_sent) + '</div></div>' +
-          '<div class="traffic-item"><div class="traffic-label">Bytes Received</div><div class="traffic-value">' + formatBytes(data.io.bytes_recv) + '</div></div>' +
-          '<div class="traffic-item"><div class="traffic-label">Packets Sent</div><div class="traffic-value">' + formatNumber(data.io.packets_sent) + '</div></div>' +
-          '<div class="traffic-item"><div class="traffic-label">Packets Received</div><div class="traffic-value">' + formatNumber(data.io.packets_recv) + '</div></div>' +
+          '<div class="traffic-item"><div class="traffic-label">Bytes sent</div><div class="traffic-value">' + formatBytes(data.io.bytes_sent) + '</div></div>' +
+          '<div class="traffic-item"><div class="traffic-label">Bytes received</div><div class="traffic-value">' + formatBytes(data.io.bytes_recv) + '</div></div>' +
+          '<div class="traffic-item"><div class="traffic-label">Packets sent</div><div class="traffic-value">' + formatNumber(data.io.packets_sent) + '</div></div>' +
+          '<div class="traffic-item"><div class="traffic-label">Packets received</div><div class="traffic-value">' + formatNumber(data.io.packets_recv) + '</div></div>' +
           '</div>';
+      }
+
+      // Detail panel container
+      if (!content.querySelector("#net-detail-container")) {
+        var detailDiv = document.createElement("div");
+        detailDiv.id = "net-detail-container";
+        content.appendChild(detailDiv);
+      }
+
+      // Stat card click handlers via delegation
+      if (!content._netClickBound) {
+        content._netClickBound = true;
+        content.addEventListener("click", function (e) {
+          var card = e.target.closest("[data-net-detail]");
+          if (!card) return;
+          loadNetworkDetail(card.dataset.netDetail);
+        });
       }
 
     } catch (err) {
       stats.innerHTML = '<div class="stat-card"><div class="stat-card-label" style="color:var(--red)">' + escapeHtml(err.message) + '</div></div>';
+    }
+  }
+
+  async function loadNetworkDetail(type) {
+    var m = selectedMachine();
+    if (!m) return;
+    var container = $("#net-detail-container");
+    if (!container) return;
+
+    // Toggle
+    var existing = container.querySelector('.detail-panel[data-type="' + type + '"]');
+    if (existing) { container.innerHTML = ""; return; }
+
+    container.innerHTML = '<div class="detail-panel" data-type="' + type + '"><div class="loading-indicator">Loading...</div></div>';
+
+    try {
+      if (type === "connections") {
+        var data = await api("/api/m/" + m.id + "/connections?limit=100");
+        var conns = data.connections || [];
+        var html = '<div class="detail-panel" data-type="connections">';
+        html += '<div class="detail-panel-header"><h3>Active connections</h3><span class="detail-panel-total">' + (data.total || 0) + ' total</span></div>';
+        html += '<table><thead><tr><th>Type</th><th>Local address</th><th>Remote address</th><th>Status</th><th>PID</th></tr></thead><tbody>';
+        conns.forEach(function (c) {
+          var statusClass = c.status === "ESTABLISHED" ? "pill-green" : c.status === "LISTEN" ? "pill-blue" : c.status === "TIME_WAIT" ? "pill-yellow" : "pill-gray";
+          html += '<tr>';
+          html += '<td>' + escapeHtml(c.type) + '</td>';
+          html += '<td style="font-family:var(--font-mono);font-size:0.8rem">' + escapeHtml(c.local) + '</td>';
+          html += '<td style="font-family:var(--font-mono);font-size:0.8rem">' + escapeHtml(c.remote || "-") + '</td>';
+          html += '<td><span class="pill ' + statusClass + '">' + escapeHtml(c.status) + '</span></td>';
+          html += '<td>' + (c.pid || "-") + '</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+
+      } else if (type === "interfaces" && networkData) {
+        var ifaces = networkData.interfaces || [];
+        var html = '<div class="detail-panel" data-type="interfaces">';
+        html += '<div class="detail-panel-header"><h3>Interface details</h3><span class="detail-panel-total">' + ifaces.length + ' interfaces</span></div>';
+        html += '<table><thead><tr><th>Name</th><th>Status</th><th>IP</th><th>Netmask</th><th>Speed</th><th>MTU</th><th>Sent</th><th>Received</th></tr></thead><tbody>';
+        ifaces.forEach(function (iface) {
+          var ip = iface.addresses && iface.addresses[0] ? iface.addresses[0].ip : "-";
+          var mask = iface.addresses && iface.addresses[0] ? iface.addresses[0].netmask : "-";
+          var statusClass = iface.is_up ? "pill-green" : "pill-red";
+          html += '<tr>';
+          html += '<td><strong>' + escapeHtml(iface.name) + '</strong></td>';
+          html += '<td><span class="pill ' + statusClass + '">' + (iface.is_up ? "UP" : "DOWN") + '</span></td>';
+          html += '<td style="font-family:var(--font-mono);font-size:0.8rem">' + escapeHtml(ip) + '</td>';
+          html += '<td style="font-family:var(--font-mono);font-size:0.8rem">' + escapeHtml(mask) + '</td>';
+          html += '<td>' + (iface.speed ? iface.speed + " Mbps" : "-") + '</td>';
+          html += '<td>' + (iface.mtu || "-") + '</td>';
+          html += '<td>' + (iface.io ? formatBytes(iface.io.bytes_sent) : "-") + '</td>';
+          html += '<td>' + (iface.io ? formatBytes(iface.io.bytes_recv) : "-") + '</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      }
+    } catch (err) {
+      container.innerHTML = '<div class="detail-panel" data-type="' + type + '"><div style="padding:20px;color:var(--danger)">' + escapeHtml(err.message) + '</div></div>';
     }
   }
 

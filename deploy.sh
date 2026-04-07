@@ -20,7 +20,7 @@ echo "  OK"
 # --- 2. Sync fichiers vers Pi ---
 echo "[2/6] Sync vers Rasta Server (Pi 5)..."
 rsync -az --exclude 'venv' --exclude '__pycache__' --exclude '.git' --exclude 'node_modules' \
-  agent/ franck@192.168.1.16:~/pi-dashboard/agent/
+  agent/ franck@192.168.1.16:~/perso/Raspberry/agent/
 echo "  OK"
 
 # --- 3. Sync fichiers vers Windows ---
@@ -43,7 +43,7 @@ echo "  Dashboard PID: $(pgrep -f 'uvicorn dashboard.main' | head -1)"
 
 # --- 5. Redemarrer agent Pi ---
 echo "[5/6] Redemarrage agent Rasta Server..."
-ssh -o ConnectTimeout=5 franck@192.168.1.16 "pkill -f 'uvicorn agent' 2>/dev/null; sleep 1; cd ~/pi-dashboard && source venv/bin/activate && nohup python3 -m uvicorn agent.main:app --host 0.0.0.0 --port 3001 > /tmp/ct-agent.log 2>&1 & sleep 3 && curl -s http://localhost:3001/health > /dev/null && echo started" || echo "  WARN: SSH failed, Pi may be offline"
+ssh -o ConnectTimeout=5 franck@192.168.1.16 "pkill -f 'uvicorn agent' 2>/dev/null; sleep 1; cd ~/perso/Raspberry && source venv/bin/activate && nohup python3 -m uvicorn agent.main:app --host 0.0.0.0 --port 3001 > /tmp/ct-agent.log 2>&1 & sleep 3 && curl -s http://localhost:3001/health > /dev/null && echo started" || echo "  WARN: SSH failed, Pi may be offline"
 echo "  OK"
 
 # --- 6. Redemarrer agent Windows ---

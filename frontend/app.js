@@ -359,7 +359,20 @@
           html += '</tr>';
         });
 
-        html += '</tbody></table></div>';
+        html += '</tbody></table>';
+
+        var homeDirs = data.home_dirs || [];
+        if (homeDirs.length > 0) {
+          html += '<div class="detail-panel-header" style="margin-top:20px"><h3>Directories</h3></div>';
+          html += '<table><thead><tr><th>Directory</th><th>Size</th></tr></thead><tbody>';
+          homeDirs.forEach(function (d) {
+            html += '<tr><td style="font-family:var(--font-mono);font-size:0.85rem">' + escapeHtml(d.name) + '</td>';
+            html += '<td><strong>' + formatBytes(d.size) + '</strong></td></tr>';
+          });
+          html += '</tbody></table>';
+        }
+
+        html += '</div>';
         container.innerHTML = html;
       }
     } catch (err) {

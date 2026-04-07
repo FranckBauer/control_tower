@@ -369,7 +369,55 @@ async def get_disk_usage():
             })
         except (PermissionError, OSError):
             pass
-    return {"partitions": partitions}
+    # Scan directories: home root, then subfolders of perso/ and projects/
+    home_dirs = []
+    home = Path.home()
+
+    async def scan_dir(directory: Path, prefix: str = ""):
+        """Scan all subdirectories and return their sizes."""
+        dirs = []
+        if not directory.exists():
+            return dirs
+        try:
+            for entry in sorted(directory.iterdir()):
+                if entry.is_dir() and not entry.name.startswith('.'):
+                    result = await _async_run(f'du -sb "{entry}" 2>/dev/null', timeout=10)
+                    if result["returncode"] == 0 and result["stdout"].strip():
+                        parts = result["stdout"].strip().split("\t")
+                        if parts:
+                            try:
+                                size = int(parts[0])
+                                label = prefix + "/" + entry.name if prefix else entry.name
+                                dirs.append({"name": label, "path": str(entry), "size": size})
+                            except ValueError:
+                                pass
+        except PermissionError:
+            pass
+        return dirs
+
+    if home.exists():
+        # Scan home root (top-level folders)
+        for entry in sorted(home.iterdir()):
+            if entry.is_dir() and not entry.name.startswith('.'):
+                result = await _async_run(f'du -sb "{entry}" --max-depth=0 2>/dev/null', timeout=10)
+                if result["returncode"] == 0 and result["stdout"].strip():
+                    parts = result["stdout"].strip().split("\t")
+                    if parts:
+                        try:
+                            size = int(parts[0])
+                            home_dirs.append({"name": "~/" + entry.name, "path": str(entry), "size": size})
+                        except ValueError:
+                            pass
+
+        # Scan inside perso/ and projects/ for individual project sizes
+        for subdir_name in ["perso", "projects"]:
+            subdir = home / subdir_name
+            if subdir.exists() and subdir.is_dir():
+                project_dirs = await scan_dir(subdir, "~/" + subdir_name)
+                home_dirs.extend(project_dirs)
+
+    home_dirs.sort(key=lambda d: d["size"], reverse=True)
+    return {"partitions": partitions, "home_dirs": home_dirs}
 
 
 # ---------------------------------------------------------------------------

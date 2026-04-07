@@ -572,6 +572,51 @@ main {
   color: var(--text-muted);
 }
 
+/* --- Disk Partition Cards --- */
+.disk-partition-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.disk-partition-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.disk-partition-info { display: flex; flex-direction: column; gap: 2px; }
+.disk-partition-info strong { font-size: 0.95rem; }
+.disk-partition-meta { font-size: 0.8rem; color: var(--text-muted); }
+.disk-partition-stats { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-family: var(--font-mono); }
+.disk-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.disk-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.disk-dirs { padding-top: 4px; }
+.disk-dir-group {
+  margin-bottom: 4px;
+  border-left: 2px solid var(--border);
+  margin-left: 8px;
+}
+.disk-dir-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 0.85rem;
+}
+.disk-dir-item.top { font-weight: 600; }
+.disk-dir-item.sub { padding-left: 32px; color: var(--text-muted); font-weight: 400; }
+.disk-dir-icon { font-size: 0.9rem; }
+.disk-dir-name { flex: 1; font-family: var(--font-mono); }
+.disk-dir-size { font-family: var(--font-mono); font-weight: 500; color: var(--text); }
+
 /* --- Stat Row (horizontal stat cards) --- */
 .stat-row {
   display: flex;

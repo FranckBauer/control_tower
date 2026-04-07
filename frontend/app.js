@@ -339,38 +339,79 @@
       } else if (type === "disk") {
         var data = await api("/api/m/" + m.id + "/disk/usage");
         var parts = data.partitions || [];
+        var homeDirs = data.home_dirs || [];
 
         var html = '<div class="detail-panel" data-type="' + type + '">';
-        html += '<div class="detail-panel-header"><h3>Disk partitions</h3></div>';
-        html += '<table><thead><tr>';
-        html += '<th>Device</th><th>Mount</th><th>Type</th><th>Total</th><th>Used</th><th>Free</th><th>Usage</th>';
-        html += '</tr></thead><tbody>';
 
+        // Render each partition as a card with its directories inside
         parts.forEach(function (p) {
           var usageClass = p.percent > 90 ? "pill-red" : p.percent > 70 ? "pill-yellow" : "pill-green";
-          html += '<tr>';
-          html += '<td><strong>' + escapeHtml(p.device) + '</strong></td>';
-          html += '<td>' + escapeHtml(p.mountpoint) + '</td>';
-          html += '<td>' + escapeHtml(p.fstype) + '</td>';
-          html += '<td>' + formatBytes(p.total) + '</td>';
-          html += '<td>' + formatBytes(p.used) + '</td>';
-          html += '<td>' + formatBytes(p.free) + '</td>';
-          html += '<td><span class="pill ' + usageClass + '">' + Math.round(p.percent) + '%</span></td>';
-          html += '</tr>';
-        });
+          var usedPct = p.percent || 0;
 
-        html += '</tbody></table>';
+          html += '<div class="disk-partition-card">';
+          html += '<div class="disk-partition-header">';
+          html += '<div class="disk-partition-info">';
+          html += '<strong>' + escapeHtml(p.device) + '</strong>';
+          html += '<span class="disk-partition-meta">' + escapeHtml(p.mountpoint) + ' &middot; ' + escapeHtml(p.fstype) + '</span>';
+          html += '</div>';
+          html += '<div class="disk-partition-stats">';
+          html += '<span>' + formatBytes(p.used) + ' / ' + formatBytes(p.total) + '</span>';
+          html += '<span class="pill ' + usageClass + '">' + Math.round(p.percent) + '%</span>';
+          html += '</div>';
+          html += '</div>';
 
-        var homeDirs = data.home_dirs || [];
-        if (homeDirs.length > 0) {
-          html += '<div class="detail-panel-header" style="margin-top:20px"><h3>Directories</h3></div>';
-          html += '<table><thead><tr><th>Directory</th><th>Size</th></tr></thead><tbody>';
-          homeDirs.forEach(function (d) {
-            html += '<tr><td style="font-family:var(--font-mono);font-size:0.85rem">' + escapeHtml(d.name) + '</td>';
-            html += '<td><strong>' + formatBytes(d.size) + '</strong></td></tr>';
+          // Usage bar
+          html += '<div class="disk-bar"><div class="disk-bar-fill" style="width:' + usedPct + '%;background:' + (usedPct > 90 ? 'var(--danger)' : usedPct > 70 ? 'var(--warning)' : 'var(--success)') + '"></div></div>';
+
+          // Directories that belong to this partition (mountpoint match)
+          var partDirs = homeDirs.filter(function (d) {
+            // Check if directory is on this partition
+            // Simple heuristic: on Linux root partition contains ~/
+            return p.mountpoint === "/" || d.path.startsWith(p.mountpoint);
           });
-          html += '</tbody></table>';
-        }
+
+          // Only show for root partition (where home dirs live)
+          if (p.mountpoint === "/" && partDirs.length > 0) {
+            // Build tree: separate top-level (~/perso, ~/projects) from sub-level (~/perso/Raspberry)
+            var topLevel = partDirs.filter(function (d) {
+              var parts = d.name.replace("~/", "").split("/");
+              return parts.length === 1;
+            });
+            var subLevel = partDirs.filter(function (d) {
+              var parts = d.name.replace("~/", "").split("/");
+              return parts.length > 1;
+            });
+
+            if (topLevel.length > 0) {
+              html += '<div class="disk-dirs">';
+              topLevel.forEach(function (d) {
+                html += '<div class="disk-dir-group">';
+                html += '<div class="disk-dir-item top">';
+                html += '<span class="disk-dir-icon">&#128193;</span>';
+                html += '<span class="disk-dir-name">' + escapeHtml(d.name) + '</span>';
+                html += '<span class="disk-dir-size">' + formatBytes(d.size) + '</span>';
+                html += '</div>';
+
+                // Find children
+                var prefix = d.name + "/";
+                var children = subLevel.filter(function (s) { return s.name.startsWith(prefix); });
+                children.forEach(function (child) {
+                  var childName = child.name.replace(prefix, "");
+                  html += '<div class="disk-dir-item sub">';
+                  html += '<span class="disk-dir-icon">&#128196;</span>';
+                  html += '<span class="disk-dir-name">' + escapeHtml(childName) + '</span>';
+                  html += '<span class="disk-dir-size">' + formatBytes(child.size) + '</span>';
+                  html += '</div>';
+                });
+
+                html += '</div>';
+              });
+              html += '</div>';
+            }
+          }
+
+          html += '</div>';
+        });
 
         html += '</div>';
         container.innerHTML = html;

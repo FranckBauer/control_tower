@@ -291,7 +291,46 @@
 
     // Load sparklines
     var m = selectedMachine();
-    if (m) loadSparklines(m.id);
+    if (m) {
+      loadSparklines(m.id);
+      loadWslInfo(m.id, content);
+    }
+  }
+
+  async function loadWslInfo(machineId, container) {
+    try {
+      var data = await api("/api/m/" + machineId + "/wsl");
+      if (!data.available) return;
+
+      // Check if WSL panel already exists
+      if (container.querySelector(".wsl-panel")) return;
+
+      var mem = data.memory || {};
+      var disk = data.disk || {};
+
+      var html = '<div class="wsl-panel">';
+      html += '<div class="sysinfo-title" style="margin-top:16px">WSL (Ubuntu)</div>';
+      html += '<div class="wsl-stats">';
+      html += '<div class="wsl-stat">';
+      html += '<span class="wsl-stat-label">RAM</span>';
+      html += '<span class="wsl-stat-value">' + formatBytes(mem.used) + ' / ' + formatBytes(mem.total) + '</span>';
+      html += '<span class="pill ' + (mem.percent > 80 ? 'pill-red' : mem.percent > 60 ? 'pill-yellow' : 'pill-green') + '">' + mem.percent + '%</span>';
+      html += '</div>';
+      html += '<div class="wsl-stat">';
+      html += '<span class="wsl-stat-label">Disk</span>';
+      html += '<span class="wsl-stat-value">' + formatBytes(disk.used) + ' / ' + formatBytes(disk.total) + '</span>';
+      html += '<span class="pill ' + (disk.percent > 80 ? 'pill-red' : disk.percent > 60 ? 'pill-yellow' : 'pill-green') + '">' + disk.percent + '%</span>';
+      html += '</div>';
+      html += '</div></div>';
+
+      // Insert before detail panel container
+      var detailContainer = container.querySelector("#detail-panel-container");
+      if (detailContainer) {
+        detailContainer.insertAdjacentHTML("beforebegin", html);
+      }
+    } catch (err) {
+      // WSL not available, silently ignore
+    }
   }
 
   async function loadDetailPanel(type) {

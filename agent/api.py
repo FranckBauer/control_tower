@@ -291,6 +291,81 @@ async def get_system_info():
 
 
 # ---------------------------------------------------------------------------
+# WSL info endpoint (Windows only)
+# ---------------------------------------------------------------------------
+
+@router.get("/api/wsl")
+async def get_wsl_info():
+    """Get WSL status, memory and disk usage from Windows host."""
+    if not IS_WINDOWS:
+        return {"available": False}
+
+    # Check WSL status
+    result = await _async_run("wsl --list --verbose", timeout=5)
+    if result["returncode"] != 0:
+        return {"available": False}
+
+    distros = []
+    for line in result["stdout"].splitlines()[1:]:
+        line = line.strip().replace("\x00", "")
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) >= 3:
+            name = parts[0].lstrip("*").strip()
+            if not name:
+                name = parts[1] if len(parts) > 1 else ""
+            distros.append(name)
+
+    # Get memory info from WSL
+    mem_result = await _async_run("wsl -e cat /proc/meminfo", timeout=5)
+    mem_total = 0
+    mem_available = 0
+    if mem_result["returncode"] == 0:
+        for line in mem_result["stdout"].splitlines():
+            if line.startswith("MemTotal:"):
+                mem_total = int(line.split()[1]) * 1024  # kB to bytes
+            elif line.startswith("MemAvailable:"):
+                mem_available = int(line.split()[1]) * 1024
+
+    mem_used = mem_total - mem_available
+    mem_percent = round((mem_used / mem_total) * 100, 1) if mem_total > 0 else 0
+
+    # Get disk usage from WSL
+    disk_result = await _async_run("wsl -e df -B1 /", timeout=5)
+    disk_total = 0
+    disk_used = 0
+    disk_free = 0
+    if disk_result["returncode"] == 0:
+        lines = disk_result["stdout"].strip().splitlines()
+        if len(lines) >= 2:
+            parts = lines[1].split()
+            if len(parts) >= 4:
+                disk_total = int(parts[1])
+                disk_used = int(parts[2])
+                disk_free = int(parts[3])
+
+    disk_percent = round((disk_used / disk_total) * 100, 1) if disk_total > 0 else 0
+
+    return {
+        "available": True,
+        "distros": distros,
+        "memory": {
+            "total": mem_total,
+            "used": mem_used,
+            "available": mem_available,
+            "percent": mem_percent,
+        },
+        "disk": {
+            "total": disk_total,
+            "used": disk_used,
+            "free": disk_free,
+            "percent": disk_percent,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Process list endpoint
 # ---------------------------------------------------------------------------
 

@@ -359,6 +359,36 @@ main {
   opacity: 0.8;
 }
 
+/* --- WSL Panel --- */
+.wsl-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.wsl-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.wsl-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wsl-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  min-width: 40px;
+}
+.wsl-stat-value {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
 /* --- History Charts --- */
 .history-toolbar {
   display: flex;

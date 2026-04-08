@@ -20,7 +20,8 @@ echo "  OK"
 # --- 2. Sync fichiers vers Pi ---
 echo "[2/6] Sync vers Rasta Server (Pi 5)..."
 rsync -az --exclude 'venv' --exclude '__pycache__' --exclude '.git' --exclude 'node_modules' \
-  agent/ franck@192.168.1.16:~/perso/Raspberry/agent/
+  --exclude 'machines.json' --exclude 'auth.json' \
+  "$PROJECT_DIR/" franck@192.168.1.16:~/perso/Raspberry/
 echo "  OK"
 
 # --- 3. Sync fichiers vers Windows ---

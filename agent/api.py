@@ -435,8 +435,10 @@ async def get_disk_usage():
         # On Windows: use fast mode (no recursive size calc) for large drives
         # On Linux: deep scan is fast enough (smaller drives)
         for part in partitions:
-            use_deep = not IS_WINDOWS or part.get("total", 0) < 100 * 1024 * 1024 * 1024  # <100GB
-            part["dirs"] = scan_dirs_fast(part["mountpoint"], deep=use_deep)
+            if not IS_WINDOWS:
+                part["dirs"] = scan_dirs_fast(part["mountpoint"], deep=True)
+            else:
+                part["dirs"] = []  # Too slow on Windows large drives
 
         # Home/user directories
         home = Path.home()
@@ -449,9 +451,7 @@ async def get_disk_usage():
                         d["name"] = f"~/{subdir_name}/{d['name']}"
                         home_dirs.append(d)
         else:
-            for d in scan_dirs_fast(str(home), deep=False):
-                d["name"] = "~\\" + d["name"]
-                home_dirs.append(d)
+            pass  # Windows: skip home dirs scan (too slow)
         return home_dirs
 
     home_dirs = await loop.run_in_executor(None, _scan_all)

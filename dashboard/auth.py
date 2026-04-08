@@ -188,6 +188,9 @@ body {
     </form>
 </div>
 <script>
+// If already authenticated, redirect immediately (handles browser back button)
+fetch("/auth/check").then(function(r) { if (r.ok) window.location.replace("/"); });
+
 async function doLogin(e) {
     e.preventDefault();
     var user = document.getElementById("username").value;

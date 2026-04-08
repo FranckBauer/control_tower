@@ -4,10 +4,14 @@ Collects CPU, RAM, Disk, Temperature every 30 seconds.
 Stores in a ring buffer (24h of data).
 """
 
+import os
+import platform
 import time
 import threading
 import psutil
 from collections import deque
+
+IS_WINDOWS = platform.system() == "Windows"
 
 # 24h at 30s intervals = 2880 points
 MAX_POINTS = 2880
@@ -40,7 +44,7 @@ def collect_once():
     """Collect a single metrics snapshot."""
     cpu = psutil.cpu_percent(interval=0)
     mem = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
+    disk = psutil.disk_usage("C:\\" if IS_WINDOWS else "/")
     swap = psutil.swap_memory()
     temp = _read_temperature()
 

@@ -769,7 +769,15 @@
       chartConfigs.forEach(function (cfg) {
         var canvas = document.getElementById(cfg.id);
         if (!canvas) return;
+        var card = canvas.closest(".history-chart-card");
         var values = metrics.map(function (m) { return m[cfg.key]; });
+        // Hide chart if all values are null (e.g. temperature on Windows)
+        var hasData = values.some(function (v) { return v != null && v !== 0; });
+        if (!hasData && (cfg.key === "temp" || cfg.key === "swap")) {
+          if (card) card.style.display = "none";
+          return;
+        }
+        if (card) card.style.display = "";
         drawChart(canvas, timestamps, values, cfg.color, cfg.unit, cfg.max);
       });
 

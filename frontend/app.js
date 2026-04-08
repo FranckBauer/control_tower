@@ -308,19 +308,37 @@
       var mem = data.memory || {};
       var disk = data.disk || {};
 
+      var memPct = mem.percent || 0;
+      var diskPct = disk.percent || 0;
+      var memColor = memPct > 80 ? 'pill-red' : memPct > 60 ? 'pill-yellow' : 'pill-green';
+      var diskColor = diskPct > 80 ? 'pill-red' : diskPct > 60 ? 'pill-yellow' : 'pill-green';
+
       var html = '<div class="wsl-panel">';
-      html += '<div class="sysinfo-title" style="margin-top:16px">WSL (Ubuntu)</div>';
-      html += '<div class="wsl-stats">';
-      html += '<div class="wsl-stat">';
-      html += '<span class="wsl-stat-label">RAM</span>';
-      html += '<span class="wsl-stat-value">' + formatBytes(mem.used) + ' / ' + formatBytes(mem.total) + '</span>';
-      html += '<span class="pill ' + (mem.percent > 80 ? 'pill-red' : mem.percent > 60 ? 'pill-yellow' : 'pill-green') + '">' + mem.percent + '%</span>';
+      html += '<div class="wsl-header">';
+      html += '<span class="wsl-title">&#128039; WSL (Ubuntu)</span>';
       html += '</div>';
-      html += '<div class="wsl-stat">';
-      html += '<span class="wsl-stat-label">Disk</span>';
-      html += '<span class="wsl-stat-value">' + formatBytes(disk.used) + ' / ' + formatBytes(disk.total) + '</span>';
-      html += '<span class="pill ' + (disk.percent > 80 ? 'pill-red' : disk.percent > 60 ? 'pill-yellow' : 'pill-green') + '">' + disk.percent + '%</span>';
+      html += '<div class="wsl-grid">';
+
+      // RAM
+      html += '<div class="wsl-metric">';
+      html += '<div class="wsl-metric-header">';
+      html += '<span class="wsl-metric-label">Memory</span>';
+      html += '<span class="pill ' + memColor + '">' + memPct + '%</span>';
       html += '</div>';
+      html += '<div class="wsl-metric-bar"><div class="wsl-metric-bar-fill" style="width:' + memPct + '%;background:' + (memPct > 80 ? 'var(--danger)' : memPct > 60 ? 'var(--warning)' : 'var(--success)') + '"></div></div>';
+      html += '<div class="wsl-metric-detail">' + formatBytes(mem.used) + ' / ' + formatBytes(mem.total) + ' &mdash; ' + formatBytes(mem.available) + ' available</div>';
+      html += '</div>';
+
+      // Disk
+      html += '<div class="wsl-metric">';
+      html += '<div class="wsl-metric-header">';
+      html += '<span class="wsl-metric-label">Disk</span>';
+      html += '<span class="pill ' + diskColor + '">' + diskPct + '%</span>';
+      html += '</div>';
+      html += '<div class="wsl-metric-bar"><div class="wsl-metric-bar-fill" style="width:' + diskPct + '%;background:' + (diskPct > 80 ? 'var(--danger)' : diskPct > 60 ? 'var(--warning)' : 'var(--success)') + '"></div></div>';
+      html += '<div class="wsl-metric-detail">' + formatBytes(disk.used) + ' / ' + formatBytes(disk.total) + ' &mdash; ' + formatBytes(disk.free) + ' free</div>';
+      html += '</div>';
+
       html += '</div></div>';
 
       // Insert before detail panel container

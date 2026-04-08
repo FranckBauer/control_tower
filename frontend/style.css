@@ -364,29 +364,55 @@ main {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 16px 20px;
+  padding: 20px;
   margin-bottom: 16px;
 }
-.wsl-stats {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
+.wsl-header {
+  margin-bottom: 16px;
 }
-.wsl-stat {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.wsl-stat-label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+.wsl-title {
+  font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
-  min-width: 40px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
 }
-.wsl-stat-value {
+.wsl-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.wsl-metric {}
+.wsl-metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.wsl-metric-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.wsl-metric-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.wsl-metric-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.wsl-metric-detail {
+  font-size: 0.8rem;
+  color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+}
+@media (max-width: 600px) {
+  .wsl-grid { grid-template-columns: 1fr; }
 }
 
 /* --- History Charts --- */

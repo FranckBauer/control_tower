@@ -16,9 +16,34 @@ router = APIRouter()
 # Config
 AUTH_FILE = Path(__file__).resolve().parent.parent / "auth.json"
 SESSION_DURATION = 86400 * 7  # 7 days
+SESSION_FILE = Path(__file__).resolve().parent.parent / ".sessions.json"
 
-# In-memory session store
-sessions = {}  # token -> {"user": str, "expires": float}
+
+def _load_sessions() -> dict:
+    """Load sessions from file."""
+    import json
+    if SESSION_FILE.exists():
+        try:
+            data = json.loads(SESSION_FILE.read_text())
+            # Clean expired sessions
+            now = time.time()
+            return {k: v for k, v in data.items() if v.get("expires", 0) > now}
+        except Exception:
+            pass
+    return {}
+
+
+def _save_sessions(sessions: dict):
+    """Save sessions to file."""
+    import json
+    try:
+        SESSION_FILE.write_text(json.dumps(sessions))
+    except Exception:
+        pass
+
+
+# File-backed session store
+sessions = _load_sessions()
 
 
 def _load_users() -> dict:
@@ -176,7 +201,7 @@ async function doLogin(e) {
             body: JSON.stringify({username: user, password: pass})
         });
         if (resp.ok) {
-            window.location.href = "/";
+            window.location.replace("/");
         } else {
             err.style.display = "block";
         }
@@ -212,6 +237,7 @@ async def login(request: Request):
             "user": username,
             "expires": time.time() + SESSION_DURATION,
         }
+        _save_sessions(sessions)
         response = JSONResponse({"success": True})
         response.set_cookie(
             key="ct_session",
@@ -230,6 +256,7 @@ async def logout(request: Request):
     token = request.cookies.get("ct_session")
     if token and token in sessions:
         del sessions[token]
+        _save_sessions(sessions)
     response = HTMLResponse(status_code=302, headers={"Location": "/auth/login"})
     response.delete_cookie("ct_session")
     return response

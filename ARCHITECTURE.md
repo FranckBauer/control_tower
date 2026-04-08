@@ -95,7 +95,7 @@ Machine 1 (Formule1)       Machine 2 (Rasta Server)     Machine 3 (a venir)
 ### Developpement (sur le PC)
 
 ```bash
-cd ~/perso/Raspberry
+cd ~/perso/control_tower
 source venv/bin/activate
 
 # Agent local (port 3001)

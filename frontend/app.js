@@ -343,7 +343,6 @@
 
         var html = '<div class="detail-panel" data-type="' + type + '">';
 
-        // Render each partition as a card with its directories inside
         parts.forEach(function (p) {
           var usageClass = p.percent > 90 ? "pill-red" : p.percent > 70 ? "pill-yellow" : "pill-green";
           var usedPct = p.percent || 0;
@@ -359,59 +358,45 @@
           html += '<span class="pill ' + usageClass + '">' + Math.round(p.percent) + '%</span>';
           html += '</div>';
           html += '</div>';
-
-          // Usage bar
           html += '<div class="disk-bar"><div class="disk-bar-fill" style="width:' + usedPct + '%;background:' + (usedPct > 90 ? 'var(--danger)' : usedPct > 70 ? 'var(--warning)' : 'var(--success)') + '"></div></div>';
 
-          // Directories that belong to this partition (mountpoint match)
-          var partDirs = homeDirs.filter(function (d) {
-            // Check if directory is on this partition
-            // Simple heuristic: on Linux root partition contains ~/
-            return p.mountpoint === "/" || d.path.startsWith(p.mountpoint);
-          });
-
-          // Only show for root partition (where home dirs live)
-          if (p.mountpoint === "/" && partDirs.length > 0) {
-            // Build tree: separate top-level (~/perso, ~/projects) from sub-level (~/perso/Raspberry)
-            var topLevel = partDirs.filter(function (d) {
-              var parts = d.name.replace("~/", "").split("/");
-              return parts.length === 1;
-            });
-            var subLevel = partDirs.filter(function (d) {
-              var parts = d.name.replace("~/", "").split("/");
-              return parts.length > 1;
-            });
-
-            if (topLevel.length > 0) {
-              html += '<div class="disk-dirs">';
-              topLevel.forEach(function (d) {
-                html += '<div class="disk-dir-group">';
-                html += '<div class="disk-dir-item top">';
-                html += '<span class="disk-dir-icon">&#128193;</span>';
-                html += '<span class="disk-dir-name">' + escapeHtml(d.name) + '</span>';
+          // Directories inside this partition
+          var dirs = p.dirs || [];
+          if (dirs.length > 0) {
+            html += '<div class="disk-dirs">';
+            dirs.forEach(function (d) {
+              html += '<div class="disk-dir-item">';
+              html += '<span class="disk-dir-icon">&#128193;</span>';
+              html += '<span class="disk-dir-name">' + escapeHtml(d.name) + '</span>';
+              if (d.size > 0) {
+                var pct = p.total > 0 ? ((d.size / p.total) * 100).toFixed(1) : 0;
                 html += '<span class="disk-dir-size">' + formatBytes(d.size) + '</span>';
-                html += '</div>';
-
-                // Find children
-                var prefix = d.name + "/";
-                var children = subLevel.filter(function (s) { return s.name.startsWith(prefix); });
-                children.forEach(function (child) {
-                  var childName = child.name.replace(prefix, "");
-                  html += '<div class="disk-dir-item sub">';
-                  html += '<span class="disk-dir-icon">&#128196;</span>';
-                  html += '<span class="disk-dir-name">' + escapeHtml(childName) + '</span>';
-                  html += '<span class="disk-dir-size">' + formatBytes(child.size) + '</span>';
-                  html += '</div>';
-                });
-
-                html += '</div>';
-              });
+                html += '<span class="disk-dir-pct">' + pct + '%</span>';
+              } else if (d.items != null) {
+                html += '<span class="disk-dir-size" style="color:var(--text-muted)">' + d.items + ' elements</span>';
+              }
               html += '</div>';
-            }
+            });
+            html += '</div>';
           }
 
           html += '</div>';
         });
+
+        // Home/user directories detail
+        if (homeDirs.length > 0) {
+          html += '<div class="disk-partition-card">';
+          html += '<div class="disk-partition-header"><div class="disk-partition-info"><strong>User directories</strong></div></div>';
+          html += '<div class="disk-dirs">';
+          homeDirs.forEach(function (d) {
+            html += '<div class="disk-dir-item">';
+            html += '<span class="disk-dir-icon">&#128193;</span>';
+            html += '<span class="disk-dir-name">' + escapeHtml(d.name) + '</span>';
+            html += '<span class="disk-dir-size">' + formatBytes(d.size) + '</span>';
+            html += '</div>';
+          });
+          html += '</div></div>';
+        }
 
         html += '</div>';
         container.innerHTML = html;

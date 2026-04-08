@@ -615,7 +615,8 @@ main {
 .disk-dir-item.sub { padding-left: 32px; color: var(--text-muted); font-weight: 400; }
 .disk-dir-icon { font-size: 0.9rem; }
 .disk-dir-name { flex: 1; font-family: var(--font-mono); }
-.disk-dir-size { font-family: var(--font-mono); font-weight: 500; color: var(--text); }
+.disk-dir-size { font-family: var(--font-mono); font-weight: 500; color: var(--text); min-width: 80px; text-align: right; }
+.disk-dir-pct { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); min-width: 50px; text-align: right; }
 
 /* --- Stat Row (horizontal stat cards) --- */
 .stat-row {

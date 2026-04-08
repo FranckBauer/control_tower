@@ -351,9 +351,17 @@ async def get_processes(sort: str = "cpu", limit: int = 25):
     return {"processes": procs[:limit], "total": len(procs)}
 
 
+_disk_cache = {"data": None, "timestamp": 0}
+DISK_CACHE_TTL = 300  # 5 minutes
+
 @router.get("/api/disk/usage")
 async def get_disk_usage():
     """Return disk usage per partition/drive with top directories if possible."""
+    import time as _time
+    now = _time.time()
+    if _disk_cache["data"] and (now - _disk_cache["timestamp"]) < DISK_CACHE_TTL:
+        return _disk_cache["data"]
+
     partitions = []
     for p in psutil.disk_partitions(all=False):
         try:
@@ -369,55 +377,90 @@ async def get_disk_usage():
             })
         except (PermissionError, OSError):
             pass
-    # Scan directories: home root, then subfolders of perso/ and projects/
-    home_dirs = []
-    home = Path.home()
+    # Scan directories per partition
+    # Each partition gets its own list of top-level dirs with sizes
+    async def get_dir_size_linux(path: str) -> int:
+        result = await _async_run(f'du -sb "{path}" --max-depth=0 2>/dev/null', timeout=10)
+        if result["returncode"] == 0 and result["stdout"].strip():
+            parts = result["stdout"].strip().split("\t")
+            try:
+                return int(parts[0])
+            except ValueError:
+                pass
+        return 0
 
-    async def scan_dir(directory: Path, prefix: str = ""):
-        """Scan all subdirectories and return their sizes."""
+    def scan_dirs_fast(mount: str, min_size: int = 100 * 1024 * 1024, deep: bool = True) -> list:
+        """Scan top-level dirs. Deep=True uses os.walk (slow for big drives). Deep=False just lists dirs."""
         dirs = []
-        if not directory.exists():
-            return dirs
+        skip = {'$Recycle.Bin', 'System Volume Information', 'Recovery',
+                '$WinREAgent', 'Config.Msi', 'proc', 'sys', 'dev', 'run', 'snap',
+                'lost+found', 'boot'}
         try:
-            for entry in sorted(directory.iterdir()):
-                if entry.is_dir() and not entry.name.startswith('.'):
-                    result = await _async_run(f'du -sb "{entry}" 2>/dev/null', timeout=10)
-                    if result["returncode"] == 0 and result["stdout"].strip():
-                        parts = result["stdout"].strip().split("\t")
-                        if parts:
-                            try:
-                                size = int(parts[0])
-                                label = prefix + "/" + entry.name if prefix else entry.name
-                                dirs.append({"name": label, "path": str(entry), "size": size})
-                            except ValueError:
-                                pass
-        except PermissionError:
+            for entry in os.scandir(mount):
+                if not entry.is_dir() or entry.name in skip or entry.name.startswith('.'):
+                    continue
+                if deep:
+                    total = 0
+                    try:
+                        for root, subdirs, files in os.walk(entry.path):
+                            for f in files:
+                                try:
+                                    total += os.path.getsize(os.path.join(root, f))
+                                except (OSError, PermissionError):
+                                    pass
+                    except (OSError, PermissionError):
+                        pass
+                    if total >= min_size:
+                        dirs.append({"name": entry.name, "path": entry.path, "size": total})
+                else:
+                    # Fast mode: just count immediate children
+                    count = 0
+                    try:
+                        count = sum(1 for _ in os.scandir(entry.path))
+                    except (OSError, PermissionError):
+                        pass
+                    dirs.append({"name": entry.name, "path": entry.path, "size": 0, "items": count})
+        except (OSError, PermissionError):
             pass
-        return dirs
+        if deep:
+            dirs.sort(key=lambda d: d["size"], reverse=True)
+        else:
+            dirs.sort(key=lambda d: d["items"], reverse=True)
+        return dirs[:15]
 
-    if home.exists():
-        # Scan home root (top-level folders)
-        for entry in sorted(home.iterdir()):
-            if entry.is_dir() and not entry.name.startswith('.'):
-                result = await _async_run(f'du -sb "{entry}" --max-depth=0 2>/dev/null', timeout=10)
-                if result["returncode"] == 0 and result["stdout"].strip():
-                    parts = result["stdout"].strip().split("\t")
-                    if parts:
-                        try:
-                            size = int(parts[0])
-                            home_dirs.append({"name": "~/" + entry.name, "path": str(entry), "size": size})
-                        except ValueError:
-                            pass
+    # Run dir scanning in a thread to avoid blocking
+    loop = asyncio.get_event_loop()
 
-        # Scan inside perso/ and projects/ for individual project sizes
-        for subdir_name in ["perso", "projects"]:
-            subdir = home / subdir_name
-            if subdir.exists() and subdir.is_dir():
-                project_dirs = await scan_dir(subdir, "~/" + subdir_name)
-                home_dirs.extend(project_dirs)
+    def _scan_all():
+        # On Windows: use fast mode (no recursive size calc) for large drives
+        # On Linux: deep scan is fast enough (smaller drives)
+        for part in partitions:
+            use_deep = not IS_WINDOWS or part.get("total", 0) < 100 * 1024 * 1024 * 1024  # <100GB
+            part["dirs"] = scan_dirs_fast(part["mountpoint"], deep=use_deep)
+
+        # Home/user directories
+        home = Path.home()
+        home_dirs = []
+        if not IS_WINDOWS:
+            for subdir_name in ["perso", "projects"]:
+                subdir = home / subdir_name
+                if subdir.exists() and subdir.is_dir():
+                    for d in scan_dirs_fast(str(subdir), min_size=100 * 1024, deep=True):
+                        d["name"] = f"~/{subdir_name}/{d['name']}"
+                        home_dirs.append(d)
+        else:
+            for d in scan_dirs_fast(str(home), deep=False):
+                d["name"] = "~\\" + d["name"]
+                home_dirs.append(d)
+        return home_dirs
+
+    home_dirs = await loop.run_in_executor(None, _scan_all)
 
     home_dirs.sort(key=lambda d: d["size"], reverse=True)
-    return {"partitions": partitions, "home_dirs": home_dirs}
+    result = {"partitions": partitions, "home_dirs": home_dirs}
+    _disk_cache["data"] = result
+    _disk_cache["timestamp"] = now
+    return result
 
 
 # ---------------------------------------------------------------------------

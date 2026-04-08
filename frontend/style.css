@@ -359,6 +359,44 @@ main {
   opacity: 0.8;
 }
 
+/* --- History Charts --- */
+.history-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.history-range-btn {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+.history-range-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.history-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 16px;
+}
+.history-chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+.history-chart-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+.history-chart-card canvas {
+  width: 100% !important;
+}
+
 /* --- Circular Gauge (mini, for overview cards) --- */
 .gauge-mini {
   width: 56px;

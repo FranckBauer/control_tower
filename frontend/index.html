@@ -32,6 +32,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         <span>Monitoring</span>
       </a>
+      <a href="#" class="nav-link" data-section="history">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>History</span>
+      </a>
       <a href="#" class="nav-link" data-section="services">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
         <span>Services</span>
@@ -70,6 +74,48 @@
         </div>
         <div id="monitoring-content">
           <div class="loading-indicator">Loading machines...</div>
+        </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section class="section hidden" id="section-history">
+        <div class="section-header">
+          <h2>History</h2>
+        </div>
+        <div class="select-machine-msg" id="history-select-msg">Select a machine to view history.</div>
+        <div id="history-content" style="display:none">
+          <div class="history-toolbar">
+            <button class="btn btn-sm history-range-btn active" data-range="30">30 min</button>
+            <button class="btn btn-sm history-range-btn" data-range="60">1 hour</button>
+            <button class="btn btn-sm history-range-btn" data-range="360">6 hours</button>
+            <button class="btn btn-sm history-range-btn" data-range="1440">24 hours</button>
+          </div>
+          <div class="history-charts">
+            <div class="history-chart-card">
+              <div class="history-chart-header">CPU %</div>
+              <canvas id="chart-cpu" height="150"></canvas>
+            </div>
+            <div class="history-chart-card">
+              <div class="history-chart-header">Memory %</div>
+              <canvas id="chart-ram" height="150"></canvas>
+            </div>
+            <div class="history-chart-card">
+              <div class="history-chart-header">Disk %</div>
+              <canvas id="chart-disk" height="150"></canvas>
+            </div>
+            <div class="history-chart-card">
+              <div class="history-chart-header">Temperature</div>
+              <canvas id="chart-temp" height="150"></canvas>
+            </div>
+            <div class="history-chart-card">
+              <div class="history-chart-header">Load Average</div>
+              <canvas id="chart-load" height="150"></canvas>
+            </div>
+            <div class="history-chart-card">
+              <div class="history-chart-header">Swap %</div>
+              <canvas id="chart-swap" height="150"></canvas>
+            </div>
+          </div>
         </div>
       </section>
 

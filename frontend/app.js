@@ -216,6 +216,7 @@
 
     switch (name) {
       case "monitoring": loadMonitoring(); break;
+      case "history": loadHistory(); break;
       case "services": loadServices(); break;
       case "network": loadNetwork(); break;
       case "files": loadFiles(); break;
@@ -681,6 +682,183 @@
     ctx.arc(lastX - 2, lastY, 2.5, 0, Math.PI * 2);
     ctx.fillStyle = "#e6edf3";
     ctx.fill();
+  }
+
+  /* ---------------------------------------------------------------
+     HISTORY
+     --------------------------------------------------------------- */
+  var historyRange = 30;
+
+  async function loadHistory() {
+    var selectMsg = $("#history-select-msg");
+    var content = $("#history-content");
+
+    if (!selectedMachineId) {
+      selectMsg.style.display = "";
+      content.style.display = "none";
+      return;
+    }
+
+    var m = selectedMachine();
+    if (!m || m.status === "offline") {
+      selectMsg.textContent = "Machine is offline.";
+      selectMsg.style.display = "";
+      content.style.display = "none";
+      return;
+    }
+
+    selectMsg.style.display = "none";
+    content.style.display = "";
+
+    fetchHistoryData(m.id, historyRange);
+
+    // Range button handlers (bind once)
+    if (!content._histBound) {
+      content._histBound = true;
+      content.addEventListener("click", function (e) {
+        var btn = e.target.closest(".history-range-btn");
+        if (!btn) return;
+        historyRange = parseInt(btn.dataset.range, 10);
+        content.querySelectorAll(".history-range-btn").forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        var cm = selectedMachine();
+        if (cm) fetchHistoryData(cm.id, historyRange);
+      });
+    }
+
+    // Auto-refresh every 30s
+    refreshTimer = setInterval(function () {
+      if (currentSection === "history" && selectedMachineId) {
+        fetchHistoryData(selectedMachineId, historyRange);
+      }
+    }, 30000);
+  }
+
+  async function fetchHistoryData(machineId, minutes) {
+    try {
+      var data = await api("/api/m/" + machineId + "/metrics/history?minutes=" + minutes);
+      var metrics = data.metrics || [];
+
+      if (metrics.length < 2) {
+        // Not enough data yet
+        ["cpu", "ram", "disk", "temp", "load", "swap"].forEach(function (key) {
+          var canvas = document.getElementById("chart-" + key);
+          if (canvas) {
+            var ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#8b949e";
+            ctx.font = "13px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("Collecting data... (" + metrics.length + " points)", canvas.width / 2, canvas.height / 2);
+          }
+        });
+        return;
+      }
+
+      var timestamps = metrics.map(function (m) { return m.ts; });
+
+      var chartConfigs = [
+        { id: "chart-cpu", key: "cpu", color: "#3fb950", unit: "%", max: 100 },
+        { id: "chart-ram", key: "ram", color: "#d29922", unit: "%", max: 100 },
+        { id: "chart-disk", key: "disk", color: "#58a6ff", unit: "%", max: 100 },
+        { id: "chart-temp", key: "temp", color: "#f85149", unit: "C", max: null },
+        { id: "chart-load", key: "load", color: "#bc8cff", unit: "", max: null },
+        { id: "chart-swap", key: "swap", color: "#e94560", unit: "%", max: 100 },
+      ];
+
+      chartConfigs.forEach(function (cfg) {
+        var canvas = document.getElementById(cfg.id);
+        if (!canvas) return;
+        var values = metrics.map(function (m) { return m[cfg.key]; });
+        drawChart(canvas, timestamps, values, cfg.color, cfg.unit, cfg.max);
+      });
+
+    } catch (err) {
+      // silent
+    }
+  }
+
+  function drawChart(canvas, timestamps, values, color, unit, fixedMax) {
+    // Set canvas resolution
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(2, 2);
+    var w = rect.width;
+    var h = rect.height;
+
+    var filtered = values.map(function (v) { return v != null ? v : 0; });
+    var max = fixedMax || Math.max.apply(null, filtered.filter(function (v) { return v > 0; })) * 1.1 || 10;
+    var min = 0;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Grid lines
+    ctx.strokeStyle = "rgba(48,54,61,0.5)";
+    ctx.lineWidth = 0.5;
+    for (var g = 0; g <= 4; g++) {
+      var gy = h - 20 - (g / 4) * (h - 30);
+      ctx.beginPath();
+      ctx.moveTo(40, gy);
+      ctx.lineTo(w, gy);
+      ctx.stroke();
+      // Label
+      ctx.fillStyle = "#8b949e";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(Math.round((g / 4) * max) + (unit ? unit : ""), 36, gy + 3);
+    }
+
+    // Time labels
+    ctx.textAlign = "center";
+    var labelCount = Math.min(6, timestamps.length);
+    for (var t = 0; t < labelCount; t++) {
+      var idx = Math.floor((t / (labelCount - 1)) * (timestamps.length - 1));
+      var x = 40 + (idx / (timestamps.length - 1)) * (w - 50);
+      var date = new Date(timestamps[idx] * 1000);
+      ctx.fillText(String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0"), x, h - 4);
+    }
+
+    // Area fill
+    ctx.beginPath();
+    ctx.moveTo(40, h - 20);
+    for (var i = 0; i < filtered.length; i++) {
+      var x = 40 + (i / (filtered.length - 1)) * (w - 50);
+      var y = h - 20 - (filtered[i] / max) * (h - 30);
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(40 + (w - 50), h - 20);
+    ctx.closePath();
+    ctx.fillStyle = color + "15";
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    for (var i = 0; i < filtered.length; i++) {
+      var x = 40 + (i / (filtered.length - 1)) * (w - 50);
+      var y = h - 20 - (filtered[i] / max) * (h - 30);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Current value
+    if (filtered.length > 0) {
+      var lastVal = filtered[filtered.length - 1];
+      var lastX = 40 + (w - 50);
+      var lastY = h - 20 - (lastVal / max) * (h - 30);
+      ctx.beginPath();
+      ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.fillStyle = "#e6edf3";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(lastVal + (unit || ""), lastX - 8, lastY - 8);
+    }
   }
 
   /* ---------------------------------------------------------------

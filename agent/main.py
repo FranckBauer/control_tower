@@ -2,15 +2,17 @@ import socket
 from datetime import datetime, timezone
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
     from agent.api import router as api_router
+    from agent.metrics import start_collector, get_history
 except ImportError:
     from api import router as api_router
+    from metrics import start_collector, get_history
 
-app = FastAPI(title="Raspberry Pi Agent")
+app = FastAPI(title="Control Tower Agent")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,6 +32,17 @@ async def health():
         "hostname": socket.gethostname(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.get("/api/metrics/history")
+async def metrics_history(minutes: int = Query(default=60)):
+    """Return metrics history for the last N minutes."""
+    return {"metrics": get_history(minutes)}
+
+
+@app.on_event("startup")
+async def on_startup():
+    start_collector()
 
 
 if __name__ == "__main__":

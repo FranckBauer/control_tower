@@ -353,6 +353,12 @@ main {
   margin-top: -6px;
 }
 
+.sparkline {
+  display: block;
+  margin: 8px auto 0;
+  opacity: 0.8;
+}
+
 /* --- Circular Gauge (mini, for overview cards) --- */
 .gauge-mini {
   width: 56px;

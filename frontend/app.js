@@ -287,6 +287,10 @@
         loadDetailPanel(card.dataset.detail);
       });
     });
+
+    // Load sparklines
+    var m = selectedMachine();
+    if (m) loadSparklines(m.id);
   }
 
   async function loadDetailPanel(type) {
@@ -602,6 +606,7 @@
   function buildMetricCard(value, unit, label, color, subtitle) {
     var numVal = (typeof value === "number") ? value : 0;
     var sortKey = label === "CPU" ? "cpu" : label === "Memory" ? "memory" : label === "Disk" ? "disk" : "";
+    var sparkKey = label === "CPU" ? "cpu" : label === "Memory" ? "ram" : label === "Disk" ? "disk" : label === "Temperature" ? "temp" : "";
     var clickAttr = sortKey ? ' data-detail="' + sortKey + '" style="cursor:pointer" title="Click for details"' : '';
     return '<div class="metric-card"' + clickAttr + '>' +
       '<div class="gauge" data-gauge-value="' + numVal + '" data-gauge-color="' + color + '">' +
@@ -611,7 +616,71 @@
       '</div></div>' +
       '<div class="metric-label">' + label + '</div>' +
       (subtitle ? '<div class="metric-subtitle">' + escapeHtml(subtitle) + '</div>' : '') +
+      (sparkKey ? '<canvas class="sparkline" data-spark-key="' + sparkKey + '" data-spark-color="' + color + '" width="160" height="40"></canvas>' : '') +
       '</div>';
+  }
+
+  function loadSparklines(machineId) {
+    api("/api/m/" + machineId + "/metrics/history?minutes=30")
+      .then(function (data) {
+        var metrics = data.metrics || [];
+        if (metrics.length < 2) return;
+
+        document.querySelectorAll(".sparkline").forEach(function (canvas) {
+          var key = canvas.dataset.sparkKey;
+          var color = canvas.dataset.sparkColor;
+          var values = metrics.map(function (m) { return m[key]; }).filter(function (v) { return v != null; });
+          if (values.length < 2) return;
+          drawSparkline(canvas, values, color);
+        });
+      })
+      .catch(function () {});
+  }
+
+  function drawSparkline(canvas, values, color) {
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width;
+    var h = canvas.height;
+    var max = Math.max.apply(null, values);
+    var min = Math.min.apply(null, values);
+    var range = max - min || 1;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Fill area
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (var i = 0; i < values.length; i++) {
+      var x = (i / (values.length - 1)) * w;
+      var y = h - ((values[i] - min) / range) * (h - 4) - 2;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = color.replace(")", ", 0.1)").replace("rgb", "rgba").replace("var(--", "");
+    // Use a simple semi-transparent version
+    ctx.fillStyle = "rgba(200, 200, 200, 0.05)";
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    for (var i = 0; i < values.length; i++) {
+      var x = (i / (values.length - 1)) * w;
+      var y = h - ((values[i] - min) / range) * (h - 4) - 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = "#8b949e";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Current value dot
+    var lastX = w;
+    var lastY = h - ((values[values.length - 1] - min) / range) * (h - 4) - 2;
+    ctx.beginPath();
+    ctx.arc(lastX - 2, lastY, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#e6edf3";
+    ctx.fill();
   }
 
   /* ---------------------------------------------------------------

@@ -28,8 +28,8 @@
 - [ ] NAT loopback Livebox non supporte (contourne via fichier hosts)
 
 ## Priorite haute
-- [ ] Authentification (token ou mot de passe)
-- [ ] HTTPS avec Let's Encrypt (certbot + Nginx)
+- [x] Authentification (htpasswd Nginx sur control.rastapi.fr)
+- [x] HTTPS avec Let's Encrypt (certbot, renouvellement auto, expire 7 juillet 2026)
 
 ## Priorite moyenne
 - [ ] Notifications/alertes (seuils CPU/RAM/Disk)

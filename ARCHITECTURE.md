@@ -1,129 +1,230 @@
-# Pi Dashboard - Architecture
+# Control Tower - Architecture
 
 ## Vue d'ensemble
 
-- Dashboard web multi-machines accessible depuis le reseau local ou via Tailscale.
-- Permet de monitorer et gerer plusieurs machines (PC, Raspberry Pi, etc.) depuis une interface unique.
-- Architecture agent/dashboard : chaque machine fait tourner un agent leger, un dashboard central agrege tout.
+Dashboard d'administration reseau multi-machines. Monitore et gere un PC Windows, son WSL et un Raspberry Pi 5 depuis une interface web unique, accessible en HTTPS sur internet.
 
-## Architecture
+---
+
+## Machines
+
+| Machine | OS | Hostname | IP LAN | IP Tailscale | Agent port | Emplacement |
+|---------|-----|----------|--------|-------------|------------|-------------|
+| Formule1 Windows | Windows 11 | Formule1 | 192.168.1.10 | 100.115.135.121 | 3002 | Ivry |
+| Formule1 WSL | Ubuntu WSL2 | Formule1 | 172.23.94.9 (NAT) | — | 3001 | Ivry (dans le PC) |
+| Rasta Server | Raspberry Pi OS (Trixie arm64) | rasta-server | 192.168.1.16 | 100.105.88.5 | 3001 | Ivry |
+| PC Campagne | ? | ? | ? | ? | 3001 | Campagne (a venir) |
+
+### Particularites reseau
+
+- **WSL** est derriere un NAT (172.23.x.x). La gateway vers Windows est 172.23.80.1 (peut changer au reboot)
+- **Tailscale** est installe sur Windows et le Pi, PAS dans WSL
+- L'IP WSL se retrouve avec : `ip route | grep default | awk '{print $3}'`
+
+---
+
+## Reseau et connectivite
+
+```
+                    Internet
+                       |
+              [IP publique Orange]
+              86.246.253.121 (dynamique)
+                       |
+               [Livebox Orange]
+               192.168.1.1
+               Port 80 → Pi
+               Port 443 → Pi
+                       |
+        +--------------+--------------+
+        |                             |
+  [Formule1 PC]                [Rasta Server Pi 5]
+  192.168.1.10                 192.168.1.16
+        |                             |
+  [WSL2 Ubuntu]                [Nginx reverse proxy]
+  172.23.94.9                  HTTPS → Dashboard :3000
+  (NAT via 172.23.80.1)
+
+
+  === Tailscale VPN (mesh, acces distant) ===
+
+  Formule1 Windows  ←→  Rasta Server Pi 5
+  100.115.135.121        100.105.88.5
+```
+
+---
+
+## Sites deployes
+
+| URL | Service | Machine | Port interne | Auth | Certificat |
+|-----|---------|---------|-------------|------|------------|
+| https://control.rastapi.fr | Control Tower Dashboard | Rasta Server (Pi) | :3000 | Login (session cookie 7j) | Let's Encrypt, expire 07/07/2026 |
+| https://stalag13.rastapi.fr | Stalag13 Mods Guide | Rasta Server (Pi) | fichiers statiques | Public | Let's Encrypt (meme cert) |
+| (prevu) https://quiquigagne.rastapi.fr | QuiQuiGagne | A migrer depuis Oracle Cloud | — | — | — |
+| (prevu) https://terje.rastapi.fr | Terje Medecine Guide | A deployer sur le Pi | — | — | — |
+
+### Domaine
+
+- **Domaine** : rastapi.fr
+- **Registrar** : OVH (compte sr894797-ovh / franck.bauer@gmail.com)
+- **Prix** : 7.79/an, renouvellement le 8 avril 2027
+
+### DNS OVH (Zone DNS)
+
+```
+control   A   86.246.253.121
+stalag13  A   86.246.253.121
+```
+
+---
+
+## Infrastructure sur le Pi (Rasta Server)
+
+### Nginx
+
+Reverse proxy HTTPS sur le Pi. Configs dans `/etc/nginx/sites-available/` :
+
+- **control.rastapi.fr** : proxy vers `http://127.0.0.1:3000` (dashboard FastAPI)
+- **stalag13.rastapi.fr** : fichiers statiques depuis `/home/franck/perso/stalag13-mods-guide/`
+
+### HTTPS / Let's Encrypt
+
+- Certificat unique pour `control.rastapi.fr` + `stalag13.rastapi.fr`
+- Renouvellement automatique via certbot
+- Expiration : 7 juillet 2026
+
+### Services systemd
+
+| Service | Port | Commande |
+|---------|------|----------|
+| `control-tower-agent.service` | :3001 | uvicorn agent.main:app |
+| `control-tower-dashboard.service` | :3000 | uvicorn dashboard.main:app |
+
+Dossier : `/home/franck/perso/control_tower/`
+Setup : `bash setup.sh` (cree les services, installe le venv, demarre tout)
+
+### Port forwarding Livebox
+
+| Port | Protocole | Destination |
+|------|-----------|-------------|
+| 80 | TCP | rasta-server (192.168.1.16) |
+| 443 | TCP | rasta-server (192.168.1.16) |
+
+---
+
+## Infrastructure sur le PC (Formule1)
+
+### Agent Windows (port 3002)
+
+- Dossier : `C:\Users\franc\pi-dashboard-agent\`
+- Lancement automatique au login via `start-silent.vbs` dans le dossier Startup
+
+### Agent WSL (port 3001)
+
+- Dossier : `/home/franck/perso/control_tower/`
+- Lancement manuel ou via deploy.sh
+
+### Dashboard (dev, port 3000)
+
+- Meme dossier que l'agent WSL
+- En prod, le dashboard tourne sur le Pi
+
+### Fichier hosts Windows (contournement NAT loopback)
+
+La Livebox ne supporte pas le NAT loopback. Pour acceder aux sites depuis le LAN :
+
+```
+# C:\Windows\System32\drivers\etc\hosts
+192.168.1.16  control.rastapi.fr  stalag13.rastapi.fr
+```
+
+Script de fix : `C:\Users\franc\fix-hosts.ps1`
+
+---
+
+## machines.json (specifique par machine)
+
+Chaque machine a son propre `machines.json` avec les IPs adaptees a son point de vue reseau.
+
+### Depuis le WSL
+
+```json
+formule1-win  → 172.23.80.1:3002   (gateway WSL vers Windows)
+formule1-wsl  → localhost:3001     (lui-meme)
+rasta-server  → 192.168.1.16:3001  (Pi sur le LAN)
+```
+
+### Depuis le Pi
+
+```json
+formule1-win  → 192.168.1.10:3002  (PC sur le LAN)
+rasta-server  → localhost:3001     (lui-meme)
+```
+
+**IMPORTANT** : `deploy.sh` exclut `machines.json` et `auth.json` du rsync pour ne pas ecraser les configs specifiques.
+
+---
+
+## Architecture logicielle
 
 ### Schema
 
 ```
 Machine 1 (Formule1)       Machine 2 (Rasta Server)     Machine 3 (a venir)
-[Agent :3001]              [Agent :3001]                [Agent :3001]
+[Agent :3001/:3002]        [Agent :3001]                [Agent :3001]
       |                          |                           |
       +--------- Reseau ---------+---------------------------+
                      |
             [Dashboard :3000]
             [Frontend + Proxy]
+                     |
+               [Nginx :443]
+                     |
+              [Internet HTTPS]
 ```
 
-### Agent (agent/)
+### Agent (`agent/`)
 
-- FastAPI sur le port 3001.
-- Tourne sur chaque machine du reseau.
-- Expose les endpoints API locaux (systeme, services, fichiers, terminal, etc.).
-- Endpoint /health pour le monitoring de disponibilite.
+- FastAPI, port 3001 (Linux) ou 3002 (Windows)
+- Tourne sur chaque machine
+- Expose : systeme, services, fichiers, terminal, reseau, logs, mises a jour
+- Endpoint `/health` pour le monitoring
 
-### Dashboard (dashboard/)
+### Dashboard (`dashboard/`)
 
-- FastAPI sur le port 3000.
-- Tourne sur une seule machine (le Pi 5 en production).
-- Sert le frontend (HTML/CSS/JS).
-- Proxy les requetes vers les agents via /api/m/{machine_id}/...
-- Gere la configuration des machines (machines.json).
-- Gere le transfert de fichiers entre machines.
+- FastAPI, port 3000
+- Sert le frontend + proxy les requetes vers les agents via `/api/m/{machine_id}/...`
+- Auth integree : page login, session cookie 7 jours, fichier `auth.json`
+- Collecteur de metriques historiques (sparklines + page History)
 
-### Frontend (frontend/)
+### Frontend (`frontend/`)
 
-- HTML/CSS/JS vanilla, pas de framework.
-- Theme sombre avec accents raspberry.
-- Selecteur de machine en haut de page.
-- Vue "Toutes les machines" pour le monitoring global.
-- Sections : Monitoring, Services, Reseau, Fichiers, Terminal, Mises a jour, Logs.
+- HTML/CSS/JS vanilla, theme sombre
+- 7 onglets : Monitoring, Services, Reseau, Fichiers, Terminal, Mises a jour, Logs
+- Vue "Toutes les machines" avec monitoring global
 
-## Endpoints API
+---
 
-### Agent (port 3001)
+## Deploiement
 
-| Methode | Endpoint | Description |
-|---------|----------|-------------|
-| GET | /health | Status + hostname + timestamp |
-| GET | /api/system | CPU, RAM, disque, temperature, uptime, load |
-| GET | /api/network | Interfaces, connexions, IO reseau |
-| GET | /api/services | Liste des services systemd et leur status |
-| POST | /api/services/{name}/{action} | Start/stop/restart un service |
-| GET | /api/logs | Logs journalctl par service |
-| POST | /api/terminal | Executer une commande (avec blocage des commandes dangereuses) |
-| POST | /api/update/check | apt update |
-| POST | /api/update/upgrade | apt upgrade -y |
-| GET | /api/files | Lister un repertoire |
-| GET | /api/files/content | Lire un fichier |
-| POST | /api/files/content | Ecrire un fichier |
-| POST | /api/files/upload | Upload un fichier (multipart) |
-| GET | /api/files/download | Telecharger un fichier |
+```bash
+bash deploy.sh
+```
 
-### Dashboard (port 3000)
+Le script fait tout en 6 etapes :
+1. Verif venv local
+2. Rsync vers le Pi (exclut machines.json, auth.json, venv, .git)
+3. Rsync vers Windows (agent uniquement)
+4. Restart dashboard + agent WSL
+5. Restart agent Pi (via SSH)
+6. Restart agent Windows (via PowerShell)
 
-| Methode | Endpoint | Description |
-|---------|----------|-------------|
-| GET | /api/machines | Liste des machines avec status online/offline |
-| POST | /api/machines | Ajouter une machine |
-| DELETE | /api/machines/{id} | Supprimer une machine |
-| POST | /api/transfer | Transferer un fichier entre machines |
-| * | /api/m/{machine_id}/{path} | Proxy vers l'agent de la machine |
-
-## Machines configurees
-
-| ID | Nom | Description | IP |
-|-----|------|-------------|-----|
-| formule1 | Formule1 | PC Ivry (Windows 11 / WSL) | localhost (dev) / 100.115.135.121 (Tailscale) |
-| rasta-server | Rasta Server | Raspberry Pi 5 | 192.168.1.16 (local) / 100.105.88.5 (Tailscale) |
-| (a venir) | PC Campagne | PC residence secondaire | A configurer |
+---
 
 ## Stack technique
 
-- Backend : Python 3.13, FastAPI, uvicorn, psutil, httpx
-- Frontend : HTML5, CSS3 (variables, grid, flexbox, conic-gradient), JavaScript vanilla
-- Reseau : Tailscale (VPN mesh) pour l'acces distant, reseau local pour le LAN
-- Deploiement : systemd service, venv Python
-
-## Lancement
-
-### Developpement (sur le PC)
-
-```bash
-cd ~/perso/control_tower
-source venv/bin/activate
-
-# Agent local (port 3001)
-python3 -m uvicorn agent.main:app --host 0.0.0.0 --port 3001 &
-
-# Dashboard (port 3000)
-python3 -m uvicorn dashboard.main:app --host 0.0.0.0 --port 3000 &
-
-# Agent sur le Pi (via SSH)
-ssh franck@192.168.1.16 "cd ~/pi-dashboard && source venv/bin/activate && nohup python3 -m uvicorn agent.main:app --host 0.0.0.0 --port 3001 > /tmp/agent.log 2>&1 &"
-```
-
-### Production (sur le Pi)
-
-```bash
-cd ~/pi-dashboard
-chmod +x setup.sh
-./setup.sh
-```
-
-## Points a revoir / ameliorer
-
-- Tailscale dans le WSL : actuellement non installe, les IPs Tailscale ne sont pas utilisables depuis le WSL.
-- Le fichier machines.json utilise des IPs en dur, il faudrait gerer les IPs Tailscale ET locales avec fallback.
-- Le dashboard devrait idealement tourner sur le Pi 5 en production (pas sur le PC).
-- Securite : pas d'authentification pour l'instant, le terminal web et les actions sudo sont ouverts.
-- Services : la liste est en dur dans le code, il faudrait la rendre configurable par machine.
-- Agent sur Windows natif : psutil fonctionne sur Windows mais systemctl non, il faut gerer les services Windows differemment.
-- Setup automatise : script pour deployer l'agent sur une nouvelle machine facilement.
-- Persistance : les agents et le dashboard devraient tourner en services systemd.
-- HTTPS : pas de TLS pour l'instant.
+- **Backend** : Python 3.13, FastAPI, uvicorn, psutil, httpx
+- **Frontend** : HTML5, CSS3 (variables, grid, flexbox), JavaScript vanilla
+- **Reverse proxy** : Nginx + Let's Encrypt
+- **VPN** : Tailscale (mesh)
+- **Deploiement** : systemd (Pi), Startup folder (Windows), deploy.sh (sync)

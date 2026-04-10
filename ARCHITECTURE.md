@@ -85,7 +85,7 @@ stalag13  A   86.246.253.121
 Reverse proxy HTTPS sur le Pi. Configs dans `/etc/nginx/sites-available/` :
 
 - **control.rastapi.fr** : proxy vers `http://127.0.0.1:3000` (dashboard FastAPI)
-- **stalag13.rastapi.fr** : fichiers statiques depuis `/home/franck/perso/stalag13-mods-guide/`
+- **stalag13.rastapi.fr** : fichiers statiques depuis `/home/franck/perso/dayz/stalag13-mods-guide/`
 
 ### HTTPS / Let's Encrypt
 
@@ -100,7 +100,7 @@ Reverse proxy HTTPS sur le Pi. Configs dans `/etc/nginx/sites-available/` :
 | `control-tower-agent.service` | :3001 | uvicorn agent.main:app |
 | `control-tower-dashboard.service` | :3000 | uvicorn dashboard.main:app |
 
-Dossier : `/home/franck/perso/control_tower/`
+Dossier : `/home/franck/perso/infra/control_tower/`
 Setup : `bash setup.sh` (cree les services, installe le venv, demarre tout)
 
 ### Port forwarding Livebox
@@ -121,7 +121,7 @@ Setup : `bash setup.sh` (cree les services, installe le venv, demarre tout)
 
 ### Agent WSL (port 3001)
 
-- Dossier : `/home/franck/perso/control_tower/`
+- Dossier : `/home/franck/perso/infra/control_tower/`
 - Lancement manuel ou via deploy.sh
 
 ### Dashboard (dev, port 3000)

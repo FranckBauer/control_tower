@@ -1,0 +1,35 @@
+{
+  "sites": [
+    {
+      "id": "stalag13",
+      "name": "Stalag 13",
+      "url": "https://stalag13.rastapi.fr/",
+      "icon": "S13"
+    },
+    {
+      "id": "control-tower",
+      "name": "Control Tower",
+      "url": "https://control.rastapi.fr/",
+      "icon": "CT"
+    },
+    {
+      "id": "terje",
+      "name": "Terje",
+      "url": "https://terje.rastapi.fr/",
+      "icon": "TJ"
+    },
+    {
+      "id": "quiquigagne",
+      "name": "Qui Qui Gagne",
+      "url": "https://quiquigagne.online/",
+      "icon": "QQ"
+    }
+  ],
+  "check_interval_seconds": 60,
+  "history_max_entries": 1440,
+  "nginx_log_paths": {
+    "stalag13": "/var/log/nginx/stalag13.access.log",
+    "control-tower": "/var/log/nginx/control.access.log",
+    "terje": "/var/log/nginx/terje.access.log"
+  }
+}

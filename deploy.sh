@@ -17,11 +17,9 @@ python3 -c "import ast; ast.parse(open('agent/api.py').read()); ast.parse(open('
 node --check frontend/app.js
 echo "  OK"
 
-# --- 2. Sync fichiers vers Pi ---
-echo "[2/6] Sync vers Rasta Server (Pi 5)..."
-rsync -az --exclude 'venv' --exclude '__pycache__' --exclude '.git' --exclude 'node_modules' \
-  --exclude 'machines.json' --exclude 'auth.json' \
-  "$PROJECT_DIR/" rasta-server:~/perso/infra/control_tower/
+# --- 2. Git pull sur Pi ---
+echo "[2/6] Pull sur Rasta Server (Pi 5)..."
+ssh rasta-server "cd ~/perso/infra/control_tower && git pull origin main"
 echo "  OK"
 
 # --- 3. Sync fichiers vers Windows ---

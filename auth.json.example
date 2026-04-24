@@ -1,0 +1,5 @@
+{
+  "users": {
+    "your_username": "sha256_hex_hash_of_password"
+  }
+}

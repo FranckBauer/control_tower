@@ -1,0 +1,13 @@
+{
+  "machines": [
+    {
+      "id": "machine-id",
+      "name": "Human-readable name",
+      "description": "Description of the machine",
+      "ip": "ip_or_localhost",
+      "agent_port": 3001,
+      "icon": "🖥️",
+      "default_path": "/"
+    }
+  ]
+}

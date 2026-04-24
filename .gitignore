@@ -13,3 +13,7 @@ build/
 .sites_history.json
 .pytest_cache/
 .claude/
+
+# Specific per machine
+machines.json
+auth.json

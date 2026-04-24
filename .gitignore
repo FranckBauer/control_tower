@@ -7,3 +7,9 @@ venv/
 *.egg-info/
 dist/
 build/
+
+# Runtime files
+.sessions.json
+.sites_history.json
+.pytest_cache/
+.claude/

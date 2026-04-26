@@ -1,5 +1,12 @@
 # Changelog
 
+## v4.1 - 2026-04-26
+### Integration de Beast (PC Campagne)
+- Ajout de Beast dans `machines.json` (Pi) via Tailscale `100.105.121.10:3002`
+- Nouveau script `setup_windows.ps1` : tache planifiee `ControlTowerAgent` SYSTEM, AtStartup, port 3002
+- ARCHITECTURE.md : section infra Beast + topologie Tailscale mise a jour
+- Pas de port forward sur Beast : acces uniquement via Tailscale
+
 ## v4.0 - 2026-04-06
 ### Revue complete des 7 onglets avec Franck
 

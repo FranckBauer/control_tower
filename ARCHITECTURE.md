@@ -13,7 +13,7 @@ Dashboard d'administration reseau multi-machines. Monitore et gere un PC Windows
 | Formule1 Windows | Windows 11 | Formule1 | 192.168.1.10 | 100.115.135.121 | 3002 | Ivry |
 | Formule1 WSL | Ubuntu WSL2 | Formule1 | 172.23.94.9 (NAT) | — | 3001 | Ivry (dans le PC) |
 | Rasta Server | Raspberry Pi OS (Trixie arm64) | rasta-server | 192.168.1.16 | 100.105.88.5 | 3001 | Ivry |
-| PC Campagne | ? | ? | ? | ? | 3001 | Campagne (a venir) |
+| Beast | Windows | beast | — (LAN distant) | 100.105.121.10 | 3002 | Campagne |
 
 ### Particularites reseau
 
@@ -48,8 +48,8 @@ Dashboard d'administration reseau multi-machines. Monitore et gere un PC Windows
 
   === Tailscale VPN (mesh, acces distant) ===
 
-  Formule1 Windows  ←→  Rasta Server Pi 5
-  100.115.135.121        100.105.88.5
+  Formule1 Windows  ←→  Rasta Server Pi 5  ←→  Beast (Campagne)
+  100.115.135.121        100.105.88.5            100.105.121.10
 ```
 
 ---
@@ -142,6 +142,33 @@ Script de fix : `C:\Users\franc\fix-hosts.ps1`
 
 ---
 
+## Infrastructure sur Beast (PC Campagne)
+
+### Agent Windows (port 3002)
+
+- Repo clone : `C:\Users\franc\perso\infra\control_tower\` (path par defaut, ajuster si different)
+- Lancement automatique au boot via tache planifiee `ControlTowerAgent` (compte SYSTEM, RunLevel Highest)
+- Joignable uniquement via Tailscale (`100.105.121.10:3002`) — pas de port forward ouvert
+- Setup : `powershell -ExecutionPolicy Bypass -File setup_windows.ps1` (en Administrateur)
+
+### Pourquoi Tailscale uniquement
+
+Beast est sur un autre LAN (campagne, IP publique 90.22.13.101 dynamique). Aucun port n'est expose sur internet — l'acces se fait uniquement via le mesh Tailscale, depuis le Pi (Rasta Server) qui sert le dashboard.
+
+### Mise a jour de l'agent
+
+L'agent Beast n'est pas couvert par `deploy.sh` (pas d'acces SSH). Pour mettre a jour :
+
+```powershell
+# Sur Beast, en Administrateur
+cd C:\Users\franc\perso\infra\control_tower
+git pull
+Stop-ScheduledTask ControlTowerAgent
+Start-ScheduledTask ControlTowerAgent
+```
+
+---
+
 ## machines.json (specifique par machine)
 
 Chaque machine a son propre `machines.json` avec les IPs adaptees a son point de vue reseau.
@@ -157,11 +184,20 @@ rasta-server  → 192.168.1.16:3001  (Pi sur le LAN)
 ### Depuis le Pi
 
 ```json
-formule1-win  → 192.168.1.10:3002  (PC sur le LAN)
-rasta-server  → localhost:3001     (lui-meme)
+formule1-win  → 192.168.1.10:3002    (PC Ivry sur le LAN)
+rasta-server  → localhost:3001       (lui-meme)
+beast         → 100.105.121.10:3002  (PC Campagne via Tailscale)
 ```
 
-**IMPORTANT** : `deploy.sh` exclut `machines.json` et `auth.json` du rsync pour ne pas ecraser les configs specifiques.
+### Depuis Beast (campagne)
+
+```json
+formule1-win  → 100.115.135.121:3002 (Tailscale)
+rasta-server  → 100.105.88.5:3001    (Tailscale)
+beast         → localhost:3002       (lui-meme)
+```
+
+**IMPORTANT** : `machines.json` et `auth.json` sont gitignored (specifiques par machine). Templates : `machines.json.example`, `auth.json.example`.
 
 ---
 

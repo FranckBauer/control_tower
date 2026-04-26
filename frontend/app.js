@@ -575,7 +575,7 @@
     html += '<div class="overview-info">';
     html += '<div class="overview-info-item"><span class="label">Host:</span><span class="value">' + escapeHtml(data.hostname) + '</span></div>';
     html += '<div class="overview-info-item"><span class="label">OS:</span><span class="value">' + escapeHtml(data.platform + " " + data.platform_release) + '</span></div>';
-    html += '<div class="overview-info-item"><span class="label">IP:</span><span class="value">' + escapeHtml(machine.ip) + '</span></div>';
+    html += '<div class="overview-info-item"><span class="label">IP:</span><span class="value">' + escapeHtml(data.ip || machine.ip) + '</span></div>';
     html += '<div class="overview-info-item"><span class="label">Uptime:</span><span class="value">' + formatUptime(data.uptime_seconds) + '</span></div>';
     html += '</div>';
 

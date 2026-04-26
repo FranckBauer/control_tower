@@ -163,6 +163,22 @@ def _read_temperature() -> Optional[float]:
     return None
 
 
+def _get_primary_ip() -> Optional[str]:
+    """IP utilisee pour sortir vers l'exterieur (route par defaut). Pas d'envoi reel."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.2)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return None
+
+
 async def _async_run(cmd: str, timeout: int = 10, stdin_data: Optional[str] = None, cwd: Optional[str] = None) -> dict:
     """Run a shell command asynchronously and return stdout/stderr/returncode."""
     try:
@@ -260,6 +276,7 @@ async def get_system_info():
 
     return {
         "hostname": socket.gethostname(),
+        "ip": _get_primary_ip(),
         "platform": platform.system(),
         "platform_release": platform.release(),
         "platform_version": platform.version(),

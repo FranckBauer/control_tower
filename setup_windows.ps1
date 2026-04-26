@@ -1,28 +1,46 @@
 # ============================================
-# Control Tower - Setup Windows
-# Cree la tache planifiee SYSTEM qui lance l'agent au boot
-# A executer en tant qu'Administrateur depuis le repo clone
+# Control Tower - Setup agent Windows
+# Installe l'agent dans C:\ProgramData\ControlTowerAgent\
+# (juste les fichiers necessaires, pas de clone git)
+# Active OpenSSH Server pour permettre la mise a jour a distance depuis le Pi
+# A lancer en Administrateur depuis le repo (le script trouve les sources tout seul)
 # ============================================
 
-$ErrorActionPreference = "Stop"
-$repoDir = $PSScriptRoot
-$taskName = "ControlTowerAgent"
-$port = 3002
+[CmdletBinding()]
+param(
+    [string] $Source = $PSScriptRoot,
+    [string] $InstallDir = "C:\ProgramData\ControlTowerAgent",
+    [int]    $Port = 3002,
+    [string] $PiPubKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBVL2PGXMe5gKVSoJL7aFXprNl/j9+fZqdSLcAUG0oZE fbauer@yacast.fr"
+)
 
-Write-Host "=== Control Tower - Setup Windows ===" -ForegroundColor Cyan
-Write-Host "Repo: $repoDir"
+$ErrorActionPreference = "Stop"
+$taskName = "ControlTowerAgent"
+
+Write-Host "=== Control Tower - Setup agent Windows ===" -ForegroundColor Cyan
+Write-Host "Source     : $Source"
+Write-Host "Installation : $InstallDir"
+Write-Host "Port       : $Port"
 Write-Host ""
 
-# Verif droits admin
+# Verif admin
 $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principalCheck = New-Object Security.Principal.WindowsPrincipal($currentUser)
 if (-not $principalCheck.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Error "Ce script doit etre lance en tant qu'Administrateur."
+    Write-Error "Le script doit etre lance en Administrateur."
     exit 1
 }
 
-# --- 1. Verif Python ---
-Write-Host "[1/5] Verification Python..."
+# Verif sources
+$srcAgent = Join-Path $Source "agent"
+$srcReqs  = Join-Path $Source "requirements.txt"
+if (-not (Test-Path $srcAgent) -or -not (Test-Path $srcReqs)) {
+    Write-Error "Sources introuvables dans $Source (attendu : agent/, requirements.txt)"
+    exit 1
+}
+
+# --- 1. Python ---
+Write-Host "[1/6] Verification Python..."
 $pythonExe = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"
 if (-not (Test-Path $pythonExe)) {
     $cmd = Get-Command python -ErrorAction SilentlyContinue
@@ -32,38 +50,39 @@ if (-not (Test-Path $pythonExe)) {
     Write-Error "Python introuvable. Installer Python 3.13 d'abord (https://www.python.org/downloads/)."
     exit 1
 }
-Write-Host "  Python: $pythonExe"
+Write-Host "  $pythonExe"
 
-# --- 2. Venv ---
-Write-Host "[2/5] Venv Python..."
-$venvDir = Join-Path $repoDir "venv"
-if (-not (Test-Path $venvDir)) {
-    & $pythonExe -m venv $venvDir
-    Write-Host "  venv cree"
-} else {
-    Write-Host "  venv existe deja"
-}
-$venvPython = Join-Path $venvDir "Scripts\python.exe"
-
-# --- 3. Dependances ---
-Write-Host "[3/5] Installation dependances..."
-& $venvPython -m pip install --upgrade pip --quiet
-& $venvPython -m pip install -r (Join-Path $repoDir "requirements.txt") --quiet
+# --- 2. Copie des fichiers ---
+Write-Host "[2/6] Copie des fichiers vers $InstallDir..."
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir "agent") | Out-Null
+Copy-Item -Force (Join-Path $srcAgent "*.py") (Join-Path $InstallDir "agent\")
+Copy-Item -Force $srcReqs (Join-Path $InstallDir "requirements.txt")
+Copy-Item -Force $PSCommandPath (Join-Path $InstallDir "setup_windows.ps1")
 Write-Host "  OK"
 
-# --- 4. Tache planifiee ---
-Write-Host "[4/5] Tache planifiee $taskName (SYSTEM, AtStartup)..."
+# --- 3. venv + deps ---
+Write-Host "[3/6] Venv Python + dependances..."
+$venvDir = Join-Path $InstallDir "venv"
+if (-not (Test-Path $venvDir)) {
+    & $pythonExe -m venv $venvDir
+}
+$venvPython = Join-Path $venvDir "Scripts\python.exe"
+& $venvPython -m pip install --upgrade pip --quiet
+& $venvPython -m pip install -r (Join-Path $InstallDir "requirements.txt") --quiet
+Write-Host "  OK"
+
+# --- 4. Tache planifiee SYSTEM ---
+Write-Host "[4/6] Tache planifiee $taskName (SYSTEM, AtStartup)..."
 $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($existing) {
     Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-    Write-Host "  ancienne tache supprimee"
 }
-
 $action = New-ScheduledTaskAction `
     -Execute $venvPython `
-    -Argument "-m uvicorn agent.main:app --host 0.0.0.0 --port $port" `
-    -WorkingDirectory $repoDir
+    -Argument "-m uvicorn agent.main:app --host 0.0.0.0 --port $Port" `
+    -WorkingDirectory $InstallDir
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet `
@@ -73,36 +92,65 @@ $settings = New-ScheduledTaskSettingsSet `
     -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1) `
     -ExecutionTimeLimit (New-TimeSpan -Days 0)
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
+    -Principal $principal -Settings $settings `
+    -Description "Control Tower Agent (port $Port)" | Out-Null
 
-Register-ScheduledTask `
-    -TaskName $taskName `
-    -Action $action `
-    -Trigger $trigger `
-    -Principal $principal `
-    -Settings $settings `
-    -Description "Control Tower Agent (port $port)" | Out-Null
-Write-Host "  OK"
+# Suppression du raccourci legacy si present
+$legacyLnk = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\ControlTowerAgent.lnk"
+if (Test-Path $legacyLnk) {
+    Remove-Item -Force $legacyLnk
+    Write-Host "  Raccourci legacy supprime : $legacyLnk"
+}
+# Suppression du dossier legacy pi-dashboard-agent si present
+$legacyDir = "$env:USERPROFILE\pi-dashboard-agent"
+if (Test-Path $legacyDir) {
+    Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$legacyDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force $legacyDir
+    Write-Host "  Dossier legacy supprime : $legacyDir"
+}
 
-# --- 5. Demarrage ---
-Write-Host "[5/5] Demarrage agent..."
+# Demarrage
 Start-ScheduledTask -TaskName $taskName
 Start-Sleep -Seconds 4
+Write-Host "  OK"
 
+# --- 5. OpenSSH Server (pour update a distance depuis le Pi) ---
+Write-Host "[5/6] OpenSSH Server..."
+$sshCap = Get-WindowsCapability -Online -Name "OpenSSH.Server*" | Select-Object -First 1
+if ($sshCap.State -ne "Installed") {
+    Add-WindowsCapability -Online -Name $sshCap.Name | Out-Null
+}
+Set-Service -Name sshd -StartupType Automatic
+Start-Service sshd -ErrorAction SilentlyContinue
+if (-not (Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -DisplayName "OpenSSH Server (sshd)" `
+        -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
+}
+# Cle publique du Pi dans administrators_authorized_keys (admin SSH)
+$adminKeys = "C:\ProgramData\ssh\administrators_authorized_keys"
+if (-not (Test-Path $adminKeys) -or -not ((Get-Content $adminKeys -ErrorAction SilentlyContinue) -contains $PiPubKey)) {
+    Add-Content -Path $adminKeys -Value $PiPubKey
+    icacls $adminKeys /inheritance:r | Out-Null
+    icacls $adminKeys /grant "Administrators:F" "SYSTEM:F" | Out-Null
+}
+Write-Host "  OK"
+
+# --- 6. Verification ---
+Write-Host "[6/6] Verification..."
 try {
-    $resp = Invoke-RestMethod -Uri "http://localhost:$port/health" -TimeoutSec 5
+    $resp = Invoke-RestMethod -Uri "http://localhost:$Port/health" -TimeoutSec 5
     Write-Host ""
     Write-Host "=== Setup OK ===" -ForegroundColor Green
-    Write-Host "Agent up - hostname: $($resp.hostname), port: $port"
+    Write-Host "Agent up - hostname: $($resp.hostname), port: $Port"
+    Write-Host "OpenSSH Server actif sur le port 22 (admin via cle Pi)"
     Write-Host ""
-    Write-Host "Commandes utiles :"
-    Write-Host "  Get-ScheduledTask $taskName"
-    Write-Host "  Stop-ScheduledTask $taskName"
-    Write-Host "  Start-ScheduledTask $taskName"
-    Write-Host "  Invoke-RestMethod http://localhost:$port/health"
+    Write-Host "Mise a jour future depuis le Pi :"
+    Write-Host "  scp agent/*.py <host>:C:/ProgramData/ControlTowerAgent/agent/"
+    Write-Host "  ssh <host> powershell Restart-ScheduledTask -TaskName ControlTowerAgent"
 } catch {
     Write-Host ""
     Write-Host "=== Agent ne repond pas ===" -ForegroundColor Red
-    Write-Host "Verifier l'etat de la tache :"
-    Write-Host "  Get-ScheduledTaskInfo -TaskName $taskName"
+    Write-Host "Verifier : Get-ScheduledTaskInfo -TaskName $taskName"
     exit 1
 }

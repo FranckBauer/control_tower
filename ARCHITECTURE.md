@@ -112,26 +112,39 @@ Setup : `bash setup.sh` (cree les services, installe le venv, demarre tout)
 
 ---
 
-## Infrastructure sur le PC (Formule1)
+## Code source : ou il se trouve
 
-### Agent Windows (port 3002)
+| Machine | Source du code | Usage |
+|---------|----------------|-------|
+| Pi (rasta-server) | `~/perso/infra/control_tower/` (clone git) | Source de verite. Dashboard + agent. |
+| WSL Formule1 | `~/perso/infra/control_tower/` (clone git) | Dev local. |
+| WSL Beast | `~/perso/infra/control_tower/` (clone git) | Dev local. |
+| Windows Formule1 | `C:\ProgramData\ControlTowerAgent\` (deploiement) | Runtime agent uniquement. **Pas un clone git.** |
+| Windows Beast | `C:\ProgramData\ControlTowerAgent\` (deploiement) | Runtime agent uniquement. **Pas un clone git.** |
 
-- Dossier : `C:\Users\franc\pi-dashboard-agent\`
-- Lancement automatique au login via `start-silent.vbs` dans le dossier Startup
+L'agent Windows tourne en Python natif (psutil/services Windows, droits SYSTEM). Sur Windows, on ne deploie que le strict necessaire : `agent/*.py`, `requirements.txt`, venv. Pas de clone git, pas de duplication de tout le repo.
 
-### Agent WSL (port 3001)
+## Agents Windows (Formule1 + Beast)
 
-- Dossier : `/home/franck/perso/infra/control_tower/`
-- Lancement manuel ou via deploy.sh
+### Installation initiale
 
-### Dashboard (dev, port 3000)
+- Cible : `C:\ProgramData\ControlTowerAgent\`
+- Tache planifiee `ControlTowerAgent` (SYSTEM, AtStartup, RunLevel Highest), port 3002
+- OpenSSH Server active sur le port 22, cle publique du Pi dans `C:\ProgramData\ssh\administrators_authorized_keys`
+- Setup : depuis WSL de la machine, `bash setup_windows.sh` (helper) ou directement `powershell.exe -Verb RunAs -File setup_windows.ps1` (UAC interactif)
 
-- Meme dossier que l'agent WSL
-- En prod, le dashboard tourne sur le Pi
+### Mise a jour
 
-### Fichier hosts Windows (contournement NAT loopback)
+`deploy.sh` depuis le Pi pousse les `.py` modifies via SSH/SCP vers chaque machine Windows et redemarre la tache planifiee. Pas de `git pull` cote Windows.
 
-La Livebox ne supporte pas le NAT loopback. Pour acceder aux sites depuis le LAN :
+### Particularites par machine
+
+- **Formule1** : LAN Ivry, joignable en `192.168.1.10:3002` ou via Tailscale `100.115.135.121:3002`
+- **Beast** : LAN campagne, joignable **uniquement via Tailscale** `100.105.121.10:3002` (pas de port forward sur le routeur campagne, et c'est tres bien ainsi : zero surface d'attaque internet)
+
+### Fichier hosts Windows (Formule1 uniquement, contournement NAT loopback)
+
+La Livebox d'Ivry ne supporte pas le NAT loopback. Pour acceder aux sites depuis le LAN Ivry :
 
 ```
 # C:\Windows\System32\drivers\etc\hosts
@@ -142,46 +155,13 @@ Script de fix : `C:\Users\franc\fix-hosts.ps1`
 
 ---
 
-## Infrastructure sur Beast (PC Campagne)
-
-### Agent Windows (port 3002)
-
-- Repo clone : `C:\Users\franc\perso\infra\control_tower\` (path par defaut, ajuster si different)
-- Lancement automatique au boot via tache planifiee `ControlTowerAgent` (compte SYSTEM, RunLevel Highest)
-- Joignable uniquement via Tailscale (`100.105.121.10:3002`) — pas de port forward ouvert
-- Setup : `powershell -ExecutionPolicy Bypass -File setup_windows.ps1` (en Administrateur)
-
-### Pourquoi Tailscale uniquement
-
-Beast est sur un autre LAN (campagne, IP publique 90.22.13.101 dynamique). Aucun port n'est expose sur internet — l'acces se fait uniquement via le mesh Tailscale, depuis le Pi (Rasta Server) qui sert le dashboard.
-
-### Mise a jour de l'agent
-
-L'agent Beast n'est pas couvert par `deploy.sh` (pas d'acces SSH). Pour mettre a jour :
-
-```powershell
-# Sur Beast, en Administrateur
-cd C:\Users\franc\perso\infra\control_tower
-git pull
-Stop-ScheduledTask ControlTowerAgent
-Start-ScheduledTask ControlTowerAgent
-```
-
----
-
 ## machines.json (specifique par machine)
 
-Chaque machine a son propre `machines.json` avec les IPs adaptees a son point de vue reseau.
+Le fichier `machines.json` n'est lu que par le **dashboard** (qui ne tourne que sur le Pi et eventuellement en dev sur les WSL). L'agent ne lit pas `machines.json`.
 
-### Depuis le WSL
+Chaque machine ou tourne un dashboard a donc son propre `machines.json` avec les IPs adaptees a son point de vue reseau.
 
-```json
-formule1-win  → 172.23.80.1:3002   (gateway WSL vers Windows)
-formule1-wsl  → localhost:3001     (lui-meme)
-rasta-server  → 192.168.1.16:3001  (Pi sur le LAN)
-```
-
-### Depuis le Pi
+### Depuis le Pi (prod)
 
 ```json
 formule1-win  → 192.168.1.10:3002    (PC Ivry sur le LAN)
@@ -189,12 +169,20 @@ rasta-server  → localhost:3001       (lui-meme)
 beast         → 100.105.121.10:3002  (PC Campagne via Tailscale)
 ```
 
-### Depuis Beast (campagne)
+### Depuis le WSL Formule1 (dev)
+
+```json
+formule1-win  → 172.23.80.1:3002   (gateway WSL vers Windows hote)
+formule1-wsl  → localhost:3001     (lui-meme)
+rasta-server  → 192.168.1.16:3001  (Pi sur le LAN)
+```
+
+### Depuis le WSL Beast (dev)
 
 ```json
 formule1-win  → 100.115.135.121:3002 (Tailscale)
 rasta-server  → 100.105.88.5:3001    (Tailscale)
-beast         → localhost:3002       (lui-meme)
+beast-win     → 100.105.121.10:3002  (Windows hote via Tailscale)
 ```
 
 **IMPORTANT** : `machines.json` et `auth.json` sont gitignored (specifiques par machine). Templates : `machines.json.example`, `auth.json.example`.

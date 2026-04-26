@@ -1,11 +1,13 @@
 # Changelog
 
 ## v4.1 - 2026-04-26
-### Integration de Beast (PC Campagne)
+### Integration de Beast (PC Campagne) + refonte agent Windows
 - Ajout de Beast dans `machines.json` (Pi) via Tailscale `100.105.121.10:3002`
-- Nouveau script `setup_windows.ps1` : tache planifiee `ControlTowerAgent` SYSTEM, AtStartup, port 3002
-- ARCHITECTURE.md : section infra Beast + topologie Tailscale mise a jour
-- Pas de port forward sur Beast : acces uniquement via Tailscale
+- **Refonte du pattern agent Windows** : plus de clone git cote Windows, plus de dossier `pi-dashboard-agent` a plat. Deploiement minimal dans `C:\ProgramData\ControlTowerAgent\` (4 .py + requirements.txt + venv). Source unique = repo Pi/WSL.
+- Nouveau script `setup_windows.ps1` : copie les fichiers depuis le clone WSL local, cree la tache planifiee `ControlTowerAgent` (SYSTEM, AtStartup, port 3002), active OpenSSH Server avec la cle publique du Pi pour permettre les mises a jour a distance.
+- `deploy.sh` refait : push SSH/SCP vers les machines Windows (au lieu du `cp /mnt/c/`), restart de la tache planifiee. Plus de dependance a un point de montage `/mnt/c/` accessible.
+- Fix : `/api/system` renvoie maintenant la vraie IP systeme (route par defaut) au lieu de l'IP de routage `machines.json` (qui peut valoir `localhost` ou une IP Tailscale, pas significative pour l'utilisateur).
+- ARCHITECTURE.md : section infra Windows refondue, topologie Tailscale a jour, table source du code par machine.
 
 ## v4.0 - 2026-04-06
 ### Revue complete des 7 onglets avec Franck

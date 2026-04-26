@@ -40,14 +40,25 @@ if (-not (Test-Path $srcAgent) -or -not (Test-Path $srcReqs)) {
 }
 
 # --- 1. Python ---
+# On cherche Python a plusieurs endroits car SYSTEM n'a pas le meme LOCALAPPDATA que les users
 Write-Host "[1/6] Verification Python..."
-$pythonExe = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"
-if (-not (Test-Path $pythonExe)) {
+$pythonExe = $null
+$candidates = @(
+    "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
+    "C:\Program Files\Python313\python.exe",
+    "C:\Python313\python.exe"
+)
+# Plus tous les profils users ou Python est typiquement installe
+$candidates += Get-ChildItem -Path "C:\Users\*\AppData\Local\Programs\Python\Python3*\python.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+foreach ($c in $candidates) {
+    if (Test-Path $c) { $pythonExe = $c; break }
+}
+if (-not $pythonExe) {
     $cmd = Get-Command python -ErrorAction SilentlyContinue
     if ($cmd) { $pythonExe = $cmd.Source }
 }
-if (-not (Test-Path $pythonExe)) {
-    Write-Error "Python introuvable. Installer Python 3.13 d'abord (https://www.python.org/downloads/)."
+if (-not $pythonExe -or -not (Test-Path $pythonExe)) {
+    Write-Error "Python introuvable. Installer Python 3.13 (https://www.python.org/downloads/)."
     exit 1
 }
 Write-Host "  $pythonExe"

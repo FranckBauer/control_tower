@@ -128,12 +128,18 @@ if (-not (Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction Silentl
         -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
 }
 # Cle publique du Pi dans administrators_authorized_keys (admin SSH)
+# IMPORTANT : owner doit etre Administrators ou SYSTEM, sinon sshd ignore le fichier silencieusement
 $adminKeys = "C:\ProgramData\ssh\administrators_authorized_keys"
-if (-not (Test-Path $adminKeys) -or -not ((Get-Content $adminKeys -ErrorAction SilentlyContinue) -contains $PiPubKey)) {
-    Add-Content -Path $adminKeys -Value $PiPubKey
-    icacls $adminKeys /inheritance:r | Out-Null
-    icacls $adminKeys /grant "Administrators:F" "SYSTEM:F" | Out-Null
+$existing = if (Test-Path $adminKeys) { Get-Content $adminKeys -ErrorAction SilentlyContinue } else { @() }
+if (-not ($existing -contains $PiPubKey)) {
+    $newContent = ($existing + $PiPubKey) -join "`n"
+    # Ecriture en ASCII (pas de BOM UTF-16/UTF-8 que sshd refuse)
+    [System.IO.File]::WriteAllText($adminKeys, $newContent + "`n", [System.Text.Encoding]::ASCII)
 }
+# Owner = Administrators + permissions Administrators+SYSTEM uniquement
+icacls $adminKeys /setowner "BUILTIN\Administrators" | Out-Null
+icacls $adminKeys /inheritance:r | Out-Null
+icacls $adminKeys /grant "BUILTIN\Administrators:F" "SYSTEM:F" | Out-Null
 Write-Host "  OK"
 
 # --- 6. Verification ---

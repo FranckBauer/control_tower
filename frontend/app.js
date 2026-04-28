@@ -207,6 +207,10 @@
       l.classList.toggle("active", l.dataset.section === name);
     });
 
+    // Sites monitore des URLs externes : la barre de selection machine est inutile
+    var bar = $("#machine-selector");
+    if (bar) bar.style.display = (name === "sites") ? "none" : "";
+
     loadSection(name);
   }
 
@@ -217,6 +221,7 @@
     switch (name) {
       case "monitoring": loadMonitoring(); break;
       case "history": loadHistory(); break;
+      case "sites": loadSites(); break;
       case "services": loadServices(); break;
       case "network": loadNetwork(); break;
       case "files": loadFiles(); break;
@@ -924,6 +929,309 @@
       ctx.textAlign = "right";
       ctx.fillText(lastVal + (unit || ""), lastX - 8, lastY - 8);
     }
+  }
+
+  /* ---------------------------------------------------------------
+     SITES
+     --------------------------------------------------------------- */
+  let sitesData = [];
+  let sitesExpandedId = null;
+
+  async function loadSites() {
+    var content = $("#sites-content");
+    var badge = $("#sites-count");
+
+    try {
+      var resp = await api("/api/sites");
+      sitesData = resp.sites || [];
+      badge.textContent = sitesData.length + " site" + (sitesData.length > 1 ? "s" : "");
+      renderSites(content);
+    } catch (err) {
+      content.innerHTML = '<div class="loading-indicator">Failed to load sites: ' + escapeHtml(err.message) + '</div>';
+    }
+
+    // Auto-refresh
+    refreshTimer = setInterval(function () {
+      if (currentSection !== "sites") return;
+      api("/api/sites").then(function (resp) {
+        sitesData = resp.sites || [];
+        renderSites($("#sites-content"));
+      }).catch(function () {});
+    }, 30000);
+  }
+
+  function renderSites(content) {
+    if (!sitesData.length) {
+      content.innerHTML = '<div class="select-machine-msg">No sites configured.</div>';
+      return;
+    }
+    var html = '<div class="sites-grid">';
+    sitesData.forEach(function (s) {
+      html += buildSiteCard(s);
+    });
+    html += '</div>';
+    if (sitesExpandedId) {
+      html += '<div id="site-detail-container"></div>';
+    }
+    content.innerHTML = html;
+
+    content.querySelectorAll(".site-card").forEach(function (card) {
+      card.addEventListener("click", function () {
+        var id = card.dataset.siteId;
+        sitesExpandedId = (sitesExpandedId === id) ? null : id;
+        renderSites(content);
+        if (sitesExpandedId) {
+          renderSiteDetail(sitesExpandedId);
+        }
+      });
+    });
+
+    if (sitesExpandedId) {
+      renderSiteDetail(sitesExpandedId);
+    }
+  }
+
+  function buildSiteCard(s) {
+    var statusClass = s.status === "up" ? "site-up" : (s.status === "error" ? "site-warning" : "site-down");
+    var statusLabel = s.status === "up" ? "UP" : (s.status === "error" ? "ERROR" : (s.status === "down" ? "DOWN" : "UNKNOWN"));
+    var codeText = s.code ? (s.code + (s.code_text ? " " + s.code_text : "")) : (s.error ? s.error : "—");
+    var ms = s.ms != null ? s.ms + " ms" : "—";
+    var uptime = s.uptime_24h != null ? s.uptime_24h + "%" : "—";
+    var avg = s.avg_ms_24h != null ? s.avg_ms_24h + " ms" : "—";
+    var expanded = sitesExpandedId === s.id ? " expanded" : "";
+
+    var html = '<div class="site-card ' + statusClass + expanded + '" data-site-id="' + s.id + '">';
+    html += '<div class="site-card-head">';
+    html += '<div class="site-card-title">';
+    html += '<span class="site-icon">' + escapeHtml(s.icon || "") + '</span>';
+    html += '<div class="site-card-name">';
+    html += '<strong>' + escapeHtml(s.name) + '</strong>';
+    html += '<span class="site-url">' + escapeHtml(s.url) + '</span>';
+    html += '</div>';
+    html += '</div>';
+    html += '<span class="site-status-pill ' + statusClass + '">' + statusLabel + '</span>';
+    html += '</div>';
+
+    html += '<div class="site-card-stats">';
+    html += '<div class="site-stat"><span class="site-stat-label">Code</span><span class="site-stat-val">' + escapeHtml(String(codeText)) + '</span></div>';
+    html += '<div class="site-stat"><span class="site-stat-label">Latency</span><span class="site-stat-val">' + ms + '</span></div>';
+    html += '<div class="site-stat"><span class="site-stat-label">Uptime 24h</span><span class="site-stat-val">' + uptime + '</span></div>';
+    html += '<div class="site-stat"><span class="site-stat-label">Avg 24h</span><span class="site-stat-val">' + avg + '</span></div>';
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderSiteDetail(siteId) {
+    var container = $("#site-detail-container");
+    if (!container) return;
+    var s = sitesData.find(function (x) { return x.id === siteId; });
+    if (!s) return;
+
+    var html = '<div class="site-detail">';
+    html += '<div class="site-detail-grid">';
+
+    // SSL card
+    html += '<div class="site-detail-card">';
+    html += '<div class="site-detail-card-header">SSL Certificate</div>';
+    if (s.ssl) {
+      html += '<div class="site-detail-row"><span>Subject</span><span>' + escapeHtml(s.ssl.subject || "—") + '</span></div>';
+      html += '<div class="site-detail-row"><span>Issuer</span><span>' + escapeHtml(s.ssl.issuer || "—") + '</span></div>';
+      html += '<div class="site-detail-row"><span>Valid from</span><span>' + escapeHtml(s.ssl.valid_from || "—") + '</span></div>';
+      html += '<div class="site-detail-row"><span>Valid until</span><span>' + escapeHtml(s.ssl.valid_until || "—") + '</span></div>';
+    } else {
+      html += '<div class="site-detail-empty">No SSL info available</div>';
+    }
+    html += '</div>';
+
+    // Headers card
+    html += '<div class="site-detail-card">';
+    html += '<div class="site-detail-card-header">HTTP Headers</div>';
+    if (s.headers && Object.keys(s.headers).length > 0) {
+      Object.keys(s.headers).forEach(function (k) {
+        if (s.headers[k] == null) return;
+        html += '<div class="site-detail-row"><span>' + escapeHtml(k) + '</span><span>' + escapeHtml(s.headers[k]) + '</span></div>';
+      });
+    } else {
+      html += '<div class="site-detail-empty">No headers captured</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    // Latency chart
+    html += '<div class="site-chart-card">';
+    html += '<div class="site-detail-card-header">Latency (last 24h)</div>';
+    html += '<canvas id="site-latency-chart" height="180"></canvas>';
+    html += '</div>';
+
+    // Analytics placeholder
+    if (s.has_nginx_log) {
+      html += '<div class="site-analytics" id="site-analytics">';
+      html += '<div class="loading-indicator">Loading analytics...</div>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+
+    drawSiteLatencyChart(s);
+    if (s.has_nginx_log) {
+      loadSiteAnalytics(s.id);
+    }
+  }
+
+  function drawSiteLatencyChart(s) {
+    var canvas = $("#site-latency-chart");
+    if (!canvas) return;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(2, 2);
+    var w = rect.width;
+    var h = rect.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    var hist = s.history || [];
+    if (hist.length < 2) {
+      ctx.fillStyle = "#8b949e";
+      ctx.font = "13px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Collecting data... (" + hist.length + " points)", w / 2, h / 2);
+      return;
+    }
+
+    var lefMargin = 40;
+    var bottomMargin = 24;
+    var topMargin = 8;
+    var rightMargin = 8;
+
+    var latenciesUp = hist.filter(function (e) { return e.status === "up" && e.ms != null; }).map(function (e) { return e.ms; });
+    var maxMs = latenciesUp.length ? Math.max.apply(null, latenciesUp) * 1.15 : 100;
+    if (maxMs < 50) maxMs = 50;
+
+    // Grid
+    ctx.strokeStyle = "rgba(48,54,61,0.5)";
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "right";
+    for (var g = 0; g <= 4; g++) {
+      var gy = topMargin + (1 - g / 4) * (h - topMargin - bottomMargin);
+      ctx.beginPath();
+      ctx.moveTo(lefMargin, gy);
+      ctx.lineTo(w - rightMargin, gy);
+      ctx.stroke();
+      ctx.fillText(Math.round((g / 4) * maxMs) + "ms", lefMargin - 4, gy + 3);
+    }
+
+    // Time labels
+    ctx.textAlign = "center";
+    var labelCount = Math.min(6, hist.length);
+    for (var t = 0; t < labelCount; t++) {
+      var idx = Math.floor((t / (labelCount - 1)) * (hist.length - 1));
+      var x = lefMargin + (idx / (hist.length - 1)) * (w - lefMargin - rightMargin);
+      var date = new Date(hist[idx].ts);
+      ctx.fillText(String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0"), x, h - 6);
+    }
+
+    // Latency line (only consecutive up segments)
+    ctx.strokeStyle = "#58a6ff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    var penDown = false;
+    for (var i = 0; i < hist.length; i++) {
+      var e = hist[i];
+      var x = lefMargin + (i / (hist.length - 1)) * (w - lefMargin - rightMargin);
+      if (e.status === "up" && e.ms != null) {
+        var y = topMargin + (1 - e.ms / maxMs) * (h - topMargin - bottomMargin);
+        if (!penDown) {
+          ctx.moveTo(x, y);
+          penDown = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      } else {
+        penDown = false;
+      }
+    }
+    ctx.stroke();
+
+    // Status dots
+    for (var j = 0; j < hist.length; j++) {
+      var ev = hist[j];
+      var px = lefMargin + (j / (hist.length - 1)) * (w - lefMargin - rightMargin);
+      var py;
+      if (ev.status === "up" && ev.ms != null) {
+        py = topMargin + (1 - ev.ms / maxMs) * (h - topMargin - bottomMargin);
+        ctx.fillStyle = "#3fb950";
+      } else {
+        py = h - bottomMargin - 2;
+        ctx.fillStyle = "#f85149";
+      }
+      ctx.beginPath();
+      ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  async function loadSiteAnalytics(siteId) {
+    var container = $("#site-analytics");
+    if (!container) return;
+    try {
+      var data = await api("/api/sites/" + siteId + "/analytics");
+      renderSiteAnalytics(container, data);
+    } catch (err) {
+      container.innerHTML = '<div class="select-machine-msg">No analytics available: ' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  function renderSiteAnalytics(container, data) {
+    var html = '<div class="site-detail-card-header">Nginx Analytics</div>';
+    html += '<div class="site-analytics-stats">';
+    html += '<div class="site-analytics-stat"><span class="big-num">' + formatNumber(data.total_requests_24h) + '</span><span class="lbl">Requests 24h</span></div>';
+    html += '<div class="site-analytics-stat"><span class="big-num">' + formatNumber(data.unique_ips_24h) + '</span><span class="lbl">Unique IPs 24h</span></div>';
+    html += '<div class="site-analytics-stat"><span class="big-num">' + formatNumber(data.requests_5min) + '</span><span class="lbl">Requests 5min</span></div>';
+    html += '<div class="site-analytics-stat"><span class="big-num">' + formatNumber(data.active_ips_5min) + '</span><span class="lbl">Active IPs 5min</span></div>';
+    html += '</div>';
+
+    // Status codes pills
+    if (data.status_codes && Object.keys(data.status_codes).length) {
+      html += '<div class="site-analytics-codes">';
+      Object.keys(data.status_codes).sort().forEach(function (k) {
+        var cls = k.startsWith("2") ? "ok" : (k.startsWith("3") ? "info" : (k.startsWith("4") ? "warn" : "err"));
+        html += '<span class="code-pill ' + cls + '">' + k + ': ' + data.status_codes[k] + '</span>';
+      });
+      html += '</div>';
+    }
+
+    // Top paths + Top IPs
+    html += '<div class="site-analytics-tops">';
+    html += '<div class="site-analytics-top">';
+    html += '<div class="site-detail-card-header">Top pages</div>';
+    if (data.top_paths && data.top_paths.length) {
+      data.top_paths.forEach(function (item) {
+        html += '<div class="site-detail-row"><span class="path">' + escapeHtml(item[0]) + '</span><span>' + formatNumber(item[1]) + '</span></div>';
+      });
+    } else {
+      html += '<div class="site-detail-empty">No data</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="site-analytics-top">';
+    html += '<div class="site-detail-card-header">Top IPs</div>';
+    if (data.top_ips && data.top_ips.length) {
+      data.top_ips.forEach(function (item) {
+        html += '<div class="site-detail-row"><span>' + escapeHtml(item[0]) + '</span><span>' + formatNumber(item[1]) + '</span></div>';
+      });
+    } else {
+      html += '<div class="site-detail-empty">No data</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    container.innerHTML = html;
   }
 
   /* ---------------------------------------------------------------

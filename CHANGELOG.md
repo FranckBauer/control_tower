@@ -1,5 +1,13 @@
 # Changelog
 
+## v4.2 - 2026-04-28
+### Reconstruction de la page Sites Monitoring
+- Onglet "Sites" reintegre dans la sidebar (perdu lors de la reorganisation du dashboard du 2026-04-24, jamais committe en git, seul `sites.json` l'etait)
+- Nouveau module `dashboard/sites.py` : checker HTTP en background toutes les 60s, persistence historique disque, infos SSL via socket TLS, parsing access logs nginx
+- Endpoints `/api/sites` (liste + statut courant + historique 24h) et `/api/sites/{id}/analytics` (requetes, IPs uniques, top pages/IPs, repartition codes HTTP)
+- Frontend : grille de cartes avec status pill UP/ERROR/DOWN, panneau de detail (SSL, headers, graphique latence canvas, analytics nginx) au clic, barre de selection machine masquee sur cette section
+- L'historique existant `.sites_history.json` (1440 entrees) est repris au demarrage
+
 ## v4.1 - 2026-04-26
 ### Integration de Beast (PC Campagne) + refonte agent Windows
 - Ajout de Beast dans `machines.json` (Pi) via Tailscale `100.105.121.10:3002`

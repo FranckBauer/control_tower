@@ -13,8 +13,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from dashboard.proxy import router as proxy_router
 from dashboard.auth import router as auth_router, _check_auth
+from dashboard.sites import router as sites_router, start_background_checker
 
 app = FastAPI(title="Control Tower")
+
+
+@app.on_event("startup")
+async def _startup():
+    start_background_checker()
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -56,6 +62,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(proxy_router)
+app.include_router(sites_router)
 
 # Mount frontend static files LAST
 frontend_dir = Path(__file__).resolve().parent.parent / "frontend"

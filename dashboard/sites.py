@@ -19,6 +19,20 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import APIRouter, HTTPException
 
+# User-agents reconnus comme bots/scanners — exclus du compteur "visiteurs uniques".
+BOT_UA_PATTERNS = re.compile(
+    r"bot|crawler|spider|scanner|fasthttp|libredtail|censys|zgrab|"
+    r"infrawat|keydrop|nmap|masscan|netsystemsresearch|paloaltonetworks|"
+    r"controltower/|curl/|wget/|python-requests",
+    re.IGNORECASE,
+)
+
+
+def _is_bot_ua(ua: str) -> bool:
+    if not ua or ua == "-":
+        return True  # absence d'UA = scanner / bot bas niveau
+    return bool(BOT_UA_PATTERNS.search(ua))
+
 router = APIRouter()
 
 CONFIG_FILE = Path(__file__).resolve().parent.parent / "sites.json"
@@ -210,8 +224,26 @@ _analytics_cache: dict[str, dict] = {}
 _ANALYTICS_TTL = 60
 
 
+# Une IP est consideree comme un visiteur humain si elle a charge au moins UN asset
+# CSS ou JS. Un navigateur charge automatiquement les <link rel="stylesheet"> et
+# <script src="..."> rencontres dans le HTML — un scanner bas-niveau ne les suit pas.
+# On exclut volontairement les images / favicon car certains scanners tapent /favicon.ico
+# ou des query strings type ?1.png.
+ASSET_PATH_RE = re.compile(r"\.(css|js|mjs)(\?|$)", re.IGNORECASE)
+
+
 def _quick_analytics(site_id: str, log_path: str) -> dict | None:
-    """Renvoie {requests_24h, unique_ips_24h} en parsant les dernieres lignes du log nginx.
+    """Renvoie les compteurs sur les dernieres 24h en parsant le log nginx.
+
+    Heuristique "vrais visiteurs humains" :
+    - exclure 127.0.0.1 (le checker / proxy se tape lui-meme)
+    - exclure les UA bot connus (regex BOT_UA_PATTERNS)
+    - retenir uniquement les IPs qui ont charge au moins 1 asset statique (CSS/JS/image)
+      — un vrai navigateur charge automatiquement les <link>/<script>, un scanner non.
+
+    On expose `requests_24h` / `unique_ips_24h` = humains estimes,
+    plus `raw_*` pour avoir le total brut (debug / interpretation).
+
     Cache 60s pour ne pas marteler le disque."""
     now = time.time()
     cached = _analytics_cache.get(site_id)
@@ -223,8 +255,10 @@ def _quick_analytics(site_id: str, log_path: str) -> dict | None:
         return None
 
     cutoff_24h = now - 24 * 3600
-    total = 0
-    ips: set[str] = set()
+    raw_total = 0
+    raw_ips: set[str] = set()
+    # Par IP candidate : nombre de hits + a-t-elle touche un asset
+    candidate: dict[str, dict] = {}
     try:
         with open(log_file, "r", errors="replace") as f:
             f.seek(0, 2)
@@ -239,12 +273,29 @@ def _quick_analytics(site_id: str, log_path: str) -> dict | None:
                     continue
                 if parsed["ts"].timestamp() < cutoff_24h:
                     continue
-                total += 1
-                ips.add(parsed["ip"])
+                raw_total += 1
+                raw_ips.add(parsed["ip"])
+                if parsed["ip"] == "127.0.0.1":
+                    continue
+                if _is_bot_ua(parsed.get("ua") or ""):
+                    continue
+                ip = parsed["ip"]
+                entry = candidate.setdefault(ip, {"hits": 0, "asset": False})
+                entry["hits"] += 1
+                if not entry["asset"] and ASSET_PATH_RE.search(parsed.get("path") or ""):
+                    entry["asset"] = True
     except OSError:
         return None
 
-    data = {"requests_24h": total, "unique_ips_24h": len(ips)}
+    human_ips = {ip for ip, e in candidate.items() if e["asset"]}
+    human_total = sum(e["hits"] for ip, e in candidate.items() if ip in human_ips)
+
+    data = {
+        "requests_24h": human_total,
+        "unique_ips_24h": len(human_ips),
+        "raw_requests_24h": raw_total,
+        "raw_unique_ips_24h": len(raw_ips),
+    }
     _analytics_cache[site_id] = {"ts": now, "data": data}
     return data
 

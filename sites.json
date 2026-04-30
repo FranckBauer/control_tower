@@ -9,7 +9,7 @@
     {
       "id": "control-tower",
       "name": "Control Tower",
-      "url": "https://control.rastapi.fr/",
+      "url": "https://control.rastapi.fr/health",
       "icon": "CT"
     },
     {

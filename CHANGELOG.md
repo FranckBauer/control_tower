@@ -1,5 +1,11 @@
 # Changelog
 
+## v4.3 - 2026-04-30
+### Audit Monitoring / Sites / Network
+- **Monitoring** : renommage machines (`Formule 1` au lieu de `Formule1 Windows`), ajout de l'IP publique sur les cartes (cache 10 min cote agent via api.ipify.org). Temperature CPU desactivee sur Windows : les valeurs lues via psutil/WMI sont des seuils ACPI figes, pas une mesure live — afficher None plutot qu'une fausse valeur (la jauge se masque deja automatiquement).
+- **Sites** : nouvel endpoint dashboard `GET /health` (non authentifie) — le checker pointe maintenant `https://control.rastapi.fr/health` au lieu de `/`, ce qui evite le `307 → /auth/login` qui s'affichait. Ajout des stats `Hits 24h` et `Visiteurs 24h` (IPs uniques) directement sur les cartes des sites avec logs nginx, via un cache 60s cote dashboard.
+- **Network** : fix CSS — les libelles `IP`, `Mask`, `Speed`, `MTU` sont maintenant separes des valeurs (flex + min-width 48px). Ajout d'une description humaine sous le nom de chaque interface (`Tailscale`, `OpenVPN`, `WSL2 / Hyper-V`, `Wi-Fi`, `Ethernet filaire`, `Adapter inactif (IP 169.254.x)`, etc.).
+
 ## v4.2 - 2026-04-28
 ### Reconstruction de la page Sites Monitoring
 - Onglet "Sites" reintegre dans la sidebar (perdu lors de la reorganisation du dashboard du 2026-04-24, jamais committe en git, seul `sites.json` l'etait)

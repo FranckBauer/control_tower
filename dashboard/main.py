@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -23,10 +23,16 @@ async def _startup():
     start_background_checker()
 
 
+@app.get("/health")
+async def health():
+    """Healthcheck non authentifie pour le monitoring externe."""
+    return JSONResponse({"status": "ok"})
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """Redirect to login page if not authenticated."""
 
-    EXEMPT_PATHS = {"/auth/login", "/auth/logout", "/auth/check", "/favicon.svg"}
+    EXEMPT_PATHS = {"/auth/login", "/auth/logout", "/auth/check", "/favicon.svg", "/health"}
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path

@@ -204,6 +204,51 @@ def start_background_checker():
         _task = asyncio.create_task(_checker_loop())
 
 
+# Cache des compteurs analytics (visites + IPs uniques 24h) pour eviter de re-parser
+# les logs nginx a chaque appel a /api/sites. Re-calcule au plus toutes les 60s.
+_analytics_cache: dict[str, dict] = {}
+_ANALYTICS_TTL = 60
+
+
+def _quick_analytics(site_id: str, log_path: str) -> dict | None:
+    """Renvoie {requests_24h, unique_ips_24h} en parsant les dernieres lignes du log nginx.
+    Cache 60s pour ne pas marteler le disque."""
+    now = time.time()
+    cached = _analytics_cache.get(site_id)
+    if cached and (now - cached["ts"]) < _ANALYTICS_TTL:
+        return cached["data"]
+
+    log_file = Path(log_path)
+    if not log_file.exists():
+        return None
+
+    cutoff_24h = now - 24 * 3600
+    total = 0
+    ips: set[str] = set()
+    try:
+        with open(log_file, "r", errors="replace") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            read_size = min(size, 50 * 1024 * 1024)
+            f.seek(size - read_size)
+            if read_size < size:
+                f.readline()
+            for line in f:
+                parsed = _parse_nginx_log_line(line)
+                if not parsed:
+                    continue
+                if parsed["ts"].timestamp() < cutoff_24h:
+                    continue
+                total += 1
+                ips.add(parsed["ip"])
+    except OSError:
+        return None
+
+    data = {"requests_24h": total, "unique_ips_24h": len(ips)}
+    _analytics_cache[site_id] = {"ts": now, "data": data}
+    return data
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -225,6 +270,7 @@ async def list_sites():
         if ts >= cutoff:
             recent_by_site[entry["id"]].append(entry)
 
+    nginx_paths = cfg.get("nginx_log_paths", {})
     out = []
     for site in sites:
         sid = site["id"]
@@ -234,6 +280,9 @@ async def list_sites():
         uptime_pct = round((up_count / len(recent)) * 100, 1) if recent else None
         latencies_up = [e["ms"] for e in recent if e["status"] == "up" and e.get("ms")]
         avg_ms = round(sum(latencies_up) / len(latencies_up)) if latencies_up else None
+
+        log_path = nginx_paths.get(sid)
+        analytics = _quick_analytics(sid, log_path) if log_path else None
 
         out.append({
             "id": sid,
@@ -251,7 +300,9 @@ async def list_sites():
             "uptime_24h": uptime_pct,
             "avg_ms_24h": avg_ms,
             "history": recent,
-            "has_nginx_log": sid in cfg.get("nginx_log_paths", {}),
+            "has_nginx_log": sid in nginx_paths,
+            "requests_24h": analytics["requests_24h"] if analytics else None,
+            "unique_ips_24h": analytics["unique_ips_24h"] if analytics else None,
         })
 
     return {

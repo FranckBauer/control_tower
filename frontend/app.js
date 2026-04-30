@@ -241,6 +241,31 @@
     return d.innerHTML;
   }
 
+  // Renvoie une description humaine d'une interface reseau a partir de son nom et de ses IPs.
+  function describeInterface(name, addresses) {
+    var n = (name || "").toLowerCase();
+    var firstIp = (addresses && addresses[0] && addresses[0].ip) || "";
+
+    // IP APIPA (auto-assigned) = adapter inactif/non configure
+    if (firstIp && firstIp.indexOf("169.254.") === 0) {
+      return "Adapter inactif (IP auto-assignee, aucune configuration reseau)";
+    }
+    if (n.indexOf("tailscale") !== -1) return "VPN Tailscale (mesh perso inter-machines)";
+    if (n.indexOf("openvpn") !== -1) return "Client OpenVPN (VPN Yacast quand connecte)";
+    if (n.indexOf("wireguard") !== -1 || n.indexOf("wg") === 0) return "VPN WireGuard";
+    if (n.indexOf("vethernet") !== -1 || n.indexOf("hyper-v") !== -1) return "Pont WSL2 / Hyper-V (machines virtuelles)";
+    if (n.indexOf("docker") !== -1 || n.indexOf("br-") === 0) return "Pont Docker (containers)";
+    if (n.indexOf("bluetooth") !== -1) return "Bluetooth PAN";
+    if (n.indexOf("wi-fi") !== -1 || n.indexOf("wifi") !== -1 || n.indexOf("wlan") !== -1) return "Wi-Fi";
+    if (n.indexOf("ethernet") !== -1 || n.indexOf("eth") === 0 || n.indexOf("enp") === 0 || n.indexOf("eno") === 0) return "Ethernet filaire";
+    if (n.indexOf("connexion au reseau local") !== -1 || n.indexOf("local area connection") !== -1) {
+      // Sur Windows, ce nom generique designe un adapter virtuel additionnel (souvent un VPN ou tunnel)
+      return "Adapter virtuel Windows (souvent un tunnel / VPN secondaire)";
+    }
+    if (n === "lo" || n === "loopback") return "Loopback (boucle locale)";
+    return "";
+  }
+
   /* ---------------------------------------------------------------
      MONITORING
      --------------------------------------------------------------- */
@@ -581,6 +606,9 @@
     html += '<div class="overview-info-item"><span class="label">Host:</span><span class="value">' + escapeHtml(data.hostname) + '</span></div>';
     html += '<div class="overview-info-item"><span class="label">OS:</span><span class="value">' + escapeHtml(data.platform + " " + data.platform_release) + '</span></div>';
     html += '<div class="overview-info-item"><span class="label">IP:</span><span class="value">' + escapeHtml(data.ip || machine.ip) + '</span></div>';
+    if (data.public_ip) {
+      html += '<div class="overview-info-item"><span class="label">IP publique:</span><span class="value">' + escapeHtml(data.public_ip) + '</span></div>';
+    }
     html += '<div class="overview-info-item"><span class="label">Uptime:</span><span class="value">' + formatUptime(data.uptime_seconds) + '</span></div>';
     html += '</div>';
 
@@ -1017,6 +1045,12 @@
     html += '<div class="site-stat"><span class="site-stat-label">Latency</span><span class="site-stat-val">' + ms + '</span></div>';
     html += '<div class="site-stat"><span class="site-stat-label">Uptime 24h</span><span class="site-stat-val">' + uptime + '</span></div>';
     html += '<div class="site-stat"><span class="site-stat-label">Avg 24h</span><span class="site-stat-val">' + avg + '</span></div>';
+    if (s.has_nginx_log) {
+      var hits = s.requests_24h != null ? formatNumber(s.requests_24h) : "—";
+      var visitors = s.unique_ips_24h != null ? formatNumber(s.unique_ips_24h) : "—";
+      html += '<div class="site-stat"><span class="site-stat-label">Hits 24h</span><span class="site-stat-val">' + hits + '</span></div>';
+      html += '<div class="site-stat"><span class="site-stat-label">Visiteurs 24h</span><span class="site-stat-val">' + visitors + '</span></div>';
+    }
     html += '</div>';
     html += '</div>';
     return html;
@@ -1578,6 +1612,10 @@
           var statusText = iface.is_up ? "UP" : "DOWN";
           ifHtml += '<div class="iface-card">';
           ifHtml += '<div class="iface-header"><span class="iface-name">' + escapeHtml(iface.name) + '</span><span class="pill ' + statusClass + '">' + statusText + '</span></div>';
+          var desc = describeInterface(iface.name, iface.addresses);
+          if (desc) {
+            ifHtml += '<div class="iface-desc">' + escapeHtml(desc) + '</div>';
+          }
           if (iface.addresses) {
             iface.addresses.forEach(function (addr) {
               ifHtml += '<div class="iface-addr"><span class="label">IP</span><span class="value">' + escapeHtml(addr.ip) + '</span></div>';

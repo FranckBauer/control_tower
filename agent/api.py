@@ -125,13 +125,21 @@ def _is_command_blocked(command: str) -> bool:
 
 
 def _read_temperature() -> Optional[float]:
-    """Read CPU temperature. Try thermal_zone0 first, then psutil, else None."""
-    if not IS_WINDOWS:
-        try:
-            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
-                return int(f.read().strip()) / 1000.0
-        except Exception:
-            pass
+    """Read CPU temperature.
+
+    Sur Linux : lecture fiable via /sys/class/thermal/thermal_zone0/temp.
+    Sur Windows : pas de mesure fiable accessible sans driver type LibreHardwareMonitor
+    (psutil et MSAcpi_ThermalZoneTemperature renvoient des valeurs figees / seuils ACPI).
+    On retourne None plutot que d'afficher une fausse valeur.
+    """
+    if IS_WINDOWS:
+        return None
+
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+            return int(f.read().strip()) / 1000.0
+    except Exception:
+        pass
 
     try:
         temps = psutil.sensors_temperatures()
@@ -141,24 +149,6 @@ def _read_temperature() -> Optional[float]:
                     return entries[0].current
     except (AttributeError, Exception):
         pass
-
-    if IS_WINDOWS:
-        # Try WMI thermal zone query
-        try:
-            import subprocess
-            result = subprocess.run(
-                ["wmic", "/namespace:\\\\root\\wmi", "PATH",
-                 "MSAcpi_ThermalZoneTemperature", "get", "CurrentTemperature"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if result.returncode == 0:
-                for line in result.stdout.strip().splitlines():
-                    line = line.strip()
-                    if line.isdigit():
-                        raw = int(line)
-                        return raw / 10.0 - 273.15
-        except Exception:
-            pass
 
     return None
 
@@ -177,6 +167,28 @@ def _get_primary_ip() -> Optional[str]:
             return socket.gethostbyname(socket.gethostname())
         except Exception:
             return None
+
+
+# Cache IP publique : on ne veut pas marteler ipify a chaque /api/system (qui est pollee toutes les 10s).
+_public_ip_cache = {"ip": None, "ts": 0.0}
+_PUBLIC_IP_TTL = 600  # 10 min
+
+
+def _get_public_ip() -> Optional[str]:
+    now = time.time()
+    if _public_ip_cache["ip"] and (now - _public_ip_cache["ts"]) < _PUBLIC_IP_TTL:
+        return _public_ip_cache["ip"]
+    try:
+        import urllib.request
+        with urllib.request.urlopen("https://api.ipify.org", timeout=2) as resp:
+            ip = resp.read().decode("ascii").strip()
+            if ip and len(ip) <= 45:
+                _public_ip_cache["ip"] = ip
+                _public_ip_cache["ts"] = now
+                return ip
+    except Exception:
+        pass
+    return _public_ip_cache["ip"]  # ancien cache si dispo, sinon None
 
 
 async def _async_run(cmd: str, timeout: int = 10, stdin_data: Optional[str] = None, cwd: Optional[str] = None) -> dict:
@@ -277,6 +289,7 @@ async def get_system_info():
     return {
         "hostname": socket.gethostname(),
         "ip": _get_primary_ip(),
+        "public_ip": _get_public_ip(),
         "platform": platform.system(),
         "platform_release": platform.release(),
         "platform_version": platform.version(),

@@ -58,7 +58,13 @@ def _save_history():
 
 
 def _read_temperature():
-    """Read CPU temperature."""
+    """Read CPU temperature.
+
+    Sur Windows : pas de mesure fiable sans driver dedie (valeurs figees ACPI),
+    on renvoie None pour eviter d'afficher une fausse valeur.
+    """
+    if IS_WINDOWS:
+        return None
     try:
         with open("/sys/class/thermal/thermal_zone0/temp") as f:
             return round(int(f.read().strip()) / 1000, 1)

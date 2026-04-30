@@ -1,5 +1,18 @@
 # Changelog
 
+## v4.5 - 2026-04-30
+### Sites — fix detection sites statiques (terje)
+- L'heuristique v4.4 exigeait au moins 1 asset CSS/JS pour qualifier une IP de "humaine".
+  Probleme : terje est purement statique (HTML + images, pas de CSS/JS externe), donc
+  meme un humain qui charge la page restait a 0 visiteur.
+- Ajout d'un critere alternatif : `Referer` qui pointe vers le hostname legitime du site
+  (ex: `Referer: https://terje.rastapi.fr/...`). Un navigateur l'envoie automatiquement
+  quand il charge des images depuis une page, un scanner non. On exige le hostname
+  pour ne pas matcher les Referer forges vers l'IP brute (`https://86.246.253.121/`).
+- `_quick_analytics(site_id, log_path, hostname)` : nouveau parametre `hostname` extrait
+  de l'URL via urlparse dans `list_sites`.
+- Resultat : terje passe de 0 -> 1 IP humaine / 126 hits 24h. Control-tower reste a 2.
+
 ## v4.4 - 2026-04-30
 ### Sites — fix compteur visiteurs
 - `_quick_analytics` filtre maintenant 3 niveaux de pollution avant de compter un "visiteur humain" :

@@ -224,25 +224,28 @@ _analytics_cache: dict[str, dict] = {}
 _ANALYTICS_TTL = 60
 
 
-# Une IP est consideree comme un visiteur humain si elle a charge au moins UN asset
-# CSS ou JS. Un navigateur charge automatiquement les <link rel="stylesheet"> et
-# <script src="..."> rencontres dans le HTML — un scanner bas-niveau ne les suit pas.
-# On exclut volontairement les images / favicon car certains scanners tapent /favicon.ico
-# ou des query strings type ?1.png.
+# Heuristique "vrai navigateur" :
+# - soit l'IP a charge un asset CSS/JS (un navigateur suit toujours les <link>/<script>)
+# - soit l'IP a au moins une requete avec un Referer non-vide (un navigateur le met
+#   automatiquement quand il charge depuis une page, un scanner bas-niveau non)
+# Les sites purement statiques sans CSS/JS externes (ex: terje, HTML+images) sont
+# couverts par le critere Referer (les images sont chargees avec Referer = la page).
 ASSET_PATH_RE = re.compile(r"\.(css|js|mjs)(\?|$)", re.IGNORECASE)
 
 
-def _quick_analytics(site_id: str, log_path: str) -> dict | None:
+def _quick_analytics(site_id: str, log_path: str, hostname: str | None = None) -> dict | None:
     """Renvoie les compteurs sur les dernieres 24h en parsant le log nginx.
 
     Heuristique "vrais visiteurs humains" :
     - exclure 127.0.0.1 (le checker / proxy se tape lui-meme)
     - exclure les UA bot connus (regex BOT_UA_PATTERNS)
-    - retenir uniquement les IPs qui ont charge au moins 1 asset statique (CSS/JS/image)
-      — un vrai navigateur charge automatiquement les <link>/<script>, un scanner non.
+    - retenir uniquement les IPs qui ont :
+        soit charge un asset CSS/JS (un navigateur suit toujours <link>/<script>)
+        soit eu au moins 1 hit avec Referer pointant vers le hostname legitime du site
+          (pas vers l'IP brute, beaucoup de scanners forgent des Referer vers l'IP).
+    Le critere Referer hostname couvre les sites statiques sans CSS/JS (ex: terje).
 
-    On expose `requests_24h` / `unique_ips_24h` = humains estimes,
-    plus `raw_*` pour avoir le total brut (debug / interpretation).
+    Si `hostname` est None, on accepte n'importe quel Referer non-vide (fallback).
 
     Cache 60s pour ne pas marteler le disque."""
     now = time.time()
@@ -257,7 +260,7 @@ def _quick_analytics(site_id: str, log_path: str) -> dict | None:
     cutoff_24h = now - 24 * 3600
     raw_total = 0
     raw_ips: set[str] = set()
-    # Par IP candidate : nombre de hits + a-t-elle touche un asset
+    # Par IP candidate : hits + a charge un asset + a vu un Referer non-vide
     candidate: dict[str, dict] = {}
     try:
         with open(log_file, "r", errors="replace") as f:
@@ -280,14 +283,20 @@ def _quick_analytics(site_id: str, log_path: str) -> dict | None:
                 if _is_bot_ua(parsed.get("ua") or ""):
                     continue
                 ip = parsed["ip"]
-                entry = candidate.setdefault(ip, {"hits": 0, "asset": False})
+                entry = candidate.setdefault(ip, {"hits": 0, "asset": False, "referer": False})
                 entry["hits"] += 1
                 if not entry["asset"] and ASSET_PATH_RE.search(parsed.get("path") or ""):
                     entry["asset"] = True
+                ref = parsed.get("ref") or ""
+                if not entry["referer"] and ref and ref != "-":
+                    if hostname is None:
+                        entry["referer"] = True
+                    elif f"://{hostname}/" in ref or ref.endswith(f"://{hostname}"):
+                        entry["referer"] = True
     except OSError:
         return None
 
-    human_ips = {ip for ip, e in candidate.items() if e["asset"]}
+    human_ips = {ip for ip, e in candidate.items() if e["asset"] or e["referer"]}
     human_total = sum(e["hits"] for ip, e in candidate.items() if ip in human_ips)
 
     data = {
@@ -333,7 +342,8 @@ async def list_sites():
         avg_ms = round(sum(latencies_up) / len(latencies_up)) if latencies_up else None
 
         log_path = nginx_paths.get(sid)
-        analytics = _quick_analytics(sid, log_path) if log_path else None
+        site_hostname = urlparse(site["url"]).hostname
+        analytics = _quick_analytics(sid, log_path, site_hostname) if log_path else None
 
         out.append({
             "id": sid,
@@ -388,6 +398,7 @@ def _parse_nginx_log_line(line: str) -> dict | None:
         "status": int(d["status"]),
         "size": int(d["size"]),
         "ua": d["ua"],
+        "ref": d["ref"],
     }
 
 

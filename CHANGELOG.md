@@ -1,5 +1,15 @@
 # Changelog
 
+## v4.4 - 2026-04-30
+### Sites — fix compteur visiteurs
+- `_quick_analytics` filtre maintenant 3 niveaux de pollution avant de compter un "visiteur humain" :
+  1. Exclusion de `127.0.0.1` (le checker du Pi se tape lui-meme via le proxy nginx → c'etait 851 hits sur 2400 dans le compteur control-tower).
+  2. Exclusion des UA bot connus (regex : `bot|crawler|spider|fasthttp|libredtail|censys|zgrab|infrawat|keydrop|nmap|masscan|ControlTower|curl|wget|python-requests`...).
+  3. Exigence d'avoir charge au moins 1 asset `.css` / `.js` / `.mjs` — un vrai navigateur charge automatiquement les `<link>` / `<script>` du HTML, un scanner non.
+- `requests_24h` / `unique_ips_24h` exposent les humains estimes ; `raw_requests_24h` / `raw_unique_ips_24h` exposent le brut pour debug.
+- Ajout de `quiquigagne` aux `nginx_log_paths` (tourne maintenant sur le Pi en gunicorn :8000, plus sur Oracle Cloud — ARCHITECTURE.md mis a jour en consequence).
+- Resultat sur 24h : control-tower passe de 65 IPs → 2 humaines (verifie : c'est bien Franck sur 2 connexions distinctes).
+
 ## v4.3 - 2026-04-30
 ### Audit Monitoring / Sites / Network
 - **Monitoring** : renommage machines (`Formule 1` au lieu de `Formule1 Windows`), ajout de l'IP publique sur les cartes (cache 10 min cote agent via api.ipify.org). Temperature CPU desactivee sur Windows : les valeurs lues via psutil/WMI sont des seuils ACPI figes, pas une mesure live — afficher None plutot qu'une fausse valeur (la jauge se masque deja automatiquement).

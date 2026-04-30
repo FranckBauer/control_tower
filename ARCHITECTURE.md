@@ -58,10 +58,10 @@ Dashboard d'administration reseau multi-machines. Monitore et gere un PC Windows
 
 | URL | Service | Machine | Port interne | Auth | Certificat |
 |-----|---------|---------|-------------|------|------------|
-| https://control.rastapi.fr | Control Tower Dashboard | Rasta Server (Pi) | :3000 | Login (session cookie 7j) | Let's Encrypt, expire 07/07/2026 |
-| https://stalag13.rastapi.fr | Stalag13 Mods Guide | Rasta Server (Pi) | fichiers statiques | Public | Let's Encrypt (meme cert) |
-| (prevu) https://quiquigagne.rastapi.fr | QuiQuiGagne | A migrer depuis Oracle Cloud | — | — | — |
-| (prevu) https://terje.rastapi.fr | Terje Medecine Guide | A deployer sur le Pi | — | — | — |
+| https://control.rastapi.fr | Control Tower Dashboard | Rasta Server (Pi) | :3000 (FastAPI) | Login (session cookie 7j) | Let's Encrypt |
+| https://stalag13.rastapi.fr | Stalag13 Mods Guide | Rasta Server (Pi) | fichiers statiques | Public | Let's Encrypt |
+| https://terje.rastapi.fr | Terje Medecine Guide | Rasta Server (Pi) | fichiers statiques | Public | Let's Encrypt |
+| https://quiquigagne.online | QuiQuiGagne | Rasta Server (Pi) | :8000 (gunicorn Flask) | App | Let's Encrypt |
 
 ### Domaine
 
@@ -86,6 +86,8 @@ Reverse proxy HTTPS sur le Pi. Configs dans `/etc/nginx/sites-available/` :
 
 - **control.rastapi.fr** : proxy vers `http://127.0.0.1:3000` (dashboard FastAPI)
 - **stalag13.rastapi.fr** : fichiers statiques depuis `/home/franck/perso/dayz/stalag13-mods-guide/`
+- **terje.rastapi.fr** : fichiers statiques depuis `/home/franck/perso/dayz/terje_medicine_guide/`
+- **quiquigagne.online** : proxy vers `http://127.0.0.1:8000` (gunicorn Flask QuiQuiGagne)
 
 ### HTTPS / Let's Encrypt
 

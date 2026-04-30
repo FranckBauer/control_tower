@@ -30,6 +30,7 @@
   "nginx_log_paths": {
     "stalag13": "/var/log/nginx/stalag13.access.log",
     "control-tower": "/var/log/nginx/control.access.log",
-    "terje": "/var/log/nginx/terje.access.log"
+    "terje": "/var/log/nginx/terje.access.log",
+    "quiquigagne": "/var/log/nginx/quiquigagne.access.log"
   }
 }

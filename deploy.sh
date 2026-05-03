@@ -24,7 +24,9 @@ echo "  OK"
 
 # --- 2. Git pull sur Pi ---
 echo "[2/6] Pull sur Rasta Server (Pi 5)..."
-ssh rasta-server "cd ~/perso/infra/control_tower && git pull origin main"
+# Keychain n'est pas charge en SSH non-interactif (guard non-interactive du .bashrc).
+# Sans ca, la cle SSH avec passphrase n'est pas dans l'agent et le git pull echoue.
+ssh rasta-server 'eval $(keychain --eval --quiet ~/.ssh/fbauer_ed25519 ~/.ssh/github_perso_ed25519) && cd ~/perso/infra/control_tower && git pull origin main'
 echo "  OK"
 
 # --- 3. Push agent vers les Windows (scp + restart) ---

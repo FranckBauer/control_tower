@@ -120,9 +120,23 @@ async def _fetch_ssl_info(host: str, port: int = 443) -> dict | None:
     return await asyncio.to_thread(_sync_fetch)
 
 
+def _build_check_url(site: dict) -> str:
+    """L'URL utilisee pour le healthcheck.
+
+    `site["url"]` = URL home du site (ce qui s'ouvre quand on clique sur le bouton).
+    `site["healthcheck_path"]` (optionnel) = chemin relatif teste par le checker.
+    Si absent, on tape la home directement.
+    """
+    base = site["url"].rstrip("/")
+    path = site.get("healthcheck_path") or "/"
+    if not path.startswith("/"):
+        path = "/" + path
+    return base + path
+
+
 async def _check_site(site: dict) -> dict:
     """Effectue un check complet d'un site (HTTP + SSL si https)."""
-    url = site["url"]
+    url = _build_check_url(site)
     parsed = urlparse(url)
     result = {
         "id": site["id"],
@@ -349,6 +363,7 @@ async def list_sites():
             "id": sid,
             "name": site["name"],
             "url": site["url"],
+            "check_url": _build_check_url(site),
             "icon": site.get("icon", ""),
             "status": cur["status"] if cur else "unknown",
             "code": cur["code"] if cur else None,

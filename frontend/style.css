@@ -1475,6 +1475,31 @@ tr:hover td { background: rgba(255,255,255,0.015); }
 .site-status-pill.site-warning { background: var(--yellow-muted); color: var(--yellow); }
 .site-status-pill.site-down { background: var(--red-muted); color: var(--red); }
 
+.site-card-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.site-open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.site-open-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-inset);
+}
+
 .site-card-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

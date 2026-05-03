@@ -1,5 +1,26 @@
 # Changelog
 
+## v4.6 - 2026-05-03
+### Sites — Immich, Navidrome, Jellyfin + bouton "ouvrir" + schéma url/healthcheck_path
+
+- Ajout de 3 services self-hosted Docker tournant sur Formule1 (WSL2) :
+  - Immich (photos) : http://100.115.135.121:2283/, healthcheck `/api/server/version`
+  - Navidrome (musique) : http://100.115.135.121:4533/, healthcheck `/` (302)
+  - Jellyfin (films/series) : http://100.115.135.121:8096/, healthcheck `/System/Info/Public`
+  - URL via Tailscale Windows (100.115.135.121) atteignable depuis le Pi
+- Bascule WSL2 en `networkingMode=mirrored` (`.wslconfig` cote Windows) : les ports WSL
+  sont accessibles depuis toutes les interfaces Windows (LAN, Tailscale, loopback) sans
+  portproxy. Plus de bidouille a chaque service ajoute.
+- Regles firewall Windows entrantes pour 2283/4533/8096 (cree via l'agent SYSTEM).
+- Schema `sites.json` : nouveau champ optionnel `healthcheck_path`. `url` est maintenant
+  l'URL home (ce qui s'ouvre quand on clique le bouton), `healthcheck_path` est le path
+  teste par le checker (default "/"). Migration de control-tower : `url` passe de
+  `/health` a `/`, `healthcheck_path: /health` ajoute.
+- Frontend : petit bouton "ouvrir dans un nouvel onglet" sur chaque carte de site (icone
+  external-link, en haut a droite, target=_blank avec stopPropagation pour ne pas trigger
+  l'expand).
+- API `/api/sites` expose desormais `check_url` (URL effectivement testee, utile au debug).
+
 ## v4.5 - 2026-04-30
 ### Sites — fix detection sites statiques (terje)
 - L'heuristique v4.4 exigeait au moins 1 asset CSS/JS pour qualifier une IP de "humaine".

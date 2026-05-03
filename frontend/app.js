@@ -1037,7 +1037,12 @@
     html += '<span class="site-url">' + escapeHtml(s.url) + '</span>';
     html += '</div>';
     html += '</div>';
+    html += '<div class="site-card-head-actions">';
+    html += '<a class="site-open-btn" href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener noreferrer" title="Ouvrir dans un nouvel onglet" onclick="event.stopPropagation()">';
+    html += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M21 3l-9 9"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>';
+    html += '</a>';
     html += '<span class="site-status-pill ' + statusClass + '">' + statusLabel + '</span>';
+    html += '</div>';
     html += '</div>';
 
     html += '<div class="site-card-stats">';

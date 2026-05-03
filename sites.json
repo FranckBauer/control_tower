@@ -9,7 +9,8 @@
     {
       "id": "control-tower",
       "name": "Control Tower",
-      "url": "https://control.rastapi.fr/health",
+      "url": "https://control.rastapi.fr/",
+      "healthcheck_path": "/health",
       "icon": "CT"
     },
     {
@@ -23,6 +24,26 @@
       "name": "Qui Qui Gagne",
       "url": "https://quiquigagne.online/",
       "icon": "QQ"
+    },
+    {
+      "id": "immich",
+      "name": "Immich",
+      "url": "http://100.115.135.121:2283/",
+      "healthcheck_path": "/api/server/version",
+      "icon": "IM"
+    },
+    {
+      "id": "navidrome",
+      "name": "Navidrome",
+      "url": "http://100.115.135.121:4533/",
+      "icon": "NV"
+    },
+    {
+      "id": "jellyfin",
+      "name": "Jellyfin",
+      "url": "http://100.115.135.121:8096/",
+      "healthcheck_path": "/System/Info/Public",
+      "icon": "JF"
     }
   ],
   "check_interval_seconds": 60,

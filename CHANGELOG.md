@@ -1,5 +1,23 @@
 # Changelog
 
+## v4.7 - 2026-05-04
+### Sous-domaines HTTPS pour immich/jellyfin/navidrome (reverse proxy Pi)
+
+- Ajout de 3 vhosts nginx sur le Pi rasta-server, avec certificats Let's Encrypt :
+  - `https://immich.rastapi.fr` → `http://100.115.135.121:2283` (Formule1 via Tailscale)
+  - `https://jellyfin.rastapi.fr` → `http://100.115.135.121:8096`
+  - `https://navidrome.rastapi.fr` → `http://100.115.135.121:4533`
+- Particularites par vhost :
+  - Immich : `client_max_body_size 50000M`, websockets, `proxy_buffering off`, timeouts 600s
+  - Jellyfin : websockets, `proxy_buffering off`, timeouts 600s (streaming continu)
+  - Navidrome : reverse proxy standard
+- Restriction d'acces : `allow 100.64.0.0/10` (Tailscale CGNAT) + `allow 192.168.1.0/24`
+  (LAN Ivry) + `allow 127.0.0.1` + `deny all`. Le DNS A est public mais le contenu n'est
+  pas expose a internet — l'URL HTTPS est juste un confort de nommage.
+- DNS OVH : 3 records A ajoutes vers 86.246.253.121 (typo `.12` corrigee pour immich).
+- `sites.json` : URLs migrees de `http://100.115.135.121:PORT/` vers `https://X.rastapi.fr/`.
+  Ajout des `nginx_log_paths` pour les 3 nouveaux sites.
+
 ## v4.6 - 2026-05-03
 ### Sites — Immich, Navidrome, Jellyfin + bouton "ouvrir" + schéma url/healthcheck_path
 

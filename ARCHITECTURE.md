@@ -62,6 +62,9 @@ Dashboard d'administration reseau multi-machines. Monitore et gere un PC Windows
 | https://stalag13.rastapi.fr | Stalag13 Mods Guide | Rasta Server (Pi) | fichiers statiques | Public | Let's Encrypt |
 | https://terje.rastapi.fr | Terje Medecine Guide | Rasta Server (Pi) | fichiers statiques | Public | Let's Encrypt |
 | https://quiquigagne.online | QuiQuiGagne | Rasta Server (Pi) | :8000 (gunicorn Flask) | App | Let's Encrypt |
+| https://immich.rastapi.fr | Immich (photos) | Pi → Formule1 :2283 | reverse proxy | Tailscale + LAN only | Let's Encrypt |
+| https://jellyfin.rastapi.fr | Jellyfin (films/series) | Pi → Formule1 :8096 | reverse proxy | Tailscale + LAN only | Let's Encrypt |
+| https://navidrome.rastapi.fr | Navidrome (musique) | Pi → Formule1 :4533 | reverse proxy | Tailscale + LAN only | Let's Encrypt |
 
 ### Domaine
 
@@ -72,8 +75,12 @@ Dashboard d'administration reseau multi-machines. Monitore et gere un PC Windows
 ### DNS OVH (Zone DNS)
 
 ```
-control   A   86.246.253.121
-stalag13  A   86.246.253.121
+control    A   86.246.253.121
+stalag13   A   86.246.253.121
+terje      A   86.246.253.121
+immich     A   86.246.253.121
+jellyfin   A   86.246.253.121
+navidrome  A   86.246.253.121
 ```
 
 ---
@@ -88,12 +95,22 @@ Reverse proxy HTTPS sur le Pi. Configs dans `/etc/nginx/sites-available/` :
 - **stalag13.rastapi.fr** : fichiers statiques depuis `/home/franck/perso/dayz/stalag13-mods-guide/`
 - **terje.rastapi.fr** : fichiers statiques depuis `/home/franck/perso/dayz/terje_medicine_guide/`
 - **quiquigagne.online** : proxy vers `http://127.0.0.1:8000` (gunicorn Flask QuiQuiGagne)
+- **immich.rastapi.fr** : proxy vers `http://100.115.135.121:2283` (Formule1 via Tailscale, `client_max_body_size 50000M`, websockets, no buffering)
+- **jellyfin.rastapi.fr** : proxy vers `http://100.115.135.121:8096` (Formule1 via Tailscale, websockets, no buffering, timeouts 600s)
+- **navidrome.rastapi.fr** : proxy vers `http://100.115.135.121:4533` (Formule1 via Tailscale)
+
+> Les 3 vhosts media (immich/jellyfin/navidrome) restreignent l'acces a `100.64.0.0/10` (Tailscale) + `192.168.1.0/24` (LAN Ivry) + `127.0.0.1`. Pas d'exposition internet publique malgre le DNS A public — l'URL HTTPS est juste un confort de nommage. Hors LAN/Tailscale, les requetes recoivent un `403 Forbidden` du nginx.
 
 ### HTTPS / Let's Encrypt
 
-- Certificat unique pour `control.rastapi.fr` + `stalag13.rastapi.fr`
-- Renouvellement automatique via certbot
-- Expiration : 7 juillet 2026
+- Certificats Let's Encrypt :
+  - `control.rastapi.fr` + `stalag13.rastapi.fr` (combine, expire 2026-07-07)
+  - `terje.rastapi.fr` (expire 2026-07-07)
+  - `quiquigagne.online` + `www.quiquigagne.online` (combine, expire 2026-07-09)
+  - `immich.rastapi.fr` (expire 2026-08-01)
+  - `jellyfin.rastapi.fr` (expire 2026-08-01)
+  - `navidrome.rastapi.fr` (expire 2026-08-01)
+- Renouvellement automatique via certbot (timer systemd)
 
 ### Services systemd
 
@@ -150,7 +167,7 @@ La Livebox d'Ivry ne supporte pas le NAT loopback. Pour acceder aux sites depuis
 
 ```
 # C:\Windows\System32\drivers\etc\hosts
-192.168.1.16  control.rastapi.fr  stalag13.rastapi.fr
+192.168.1.16  control.rastapi.fr  stalag13.rastapi.fr  terje.rastapi.fr  immich.rastapi.fr  jellyfin.rastapi.fr  navidrome.rastapi.fr
 ```
 
 Script de fix : `C:\Users\franc\fix-hosts.ps1`

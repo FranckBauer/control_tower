@@ -28,20 +28,20 @@
     {
       "id": "immich",
       "name": "Immich",
-      "url": "http://100.115.135.121:2283/",
+      "url": "https://immich.rastapi.fr/",
       "healthcheck_path": "/api/server/version",
       "icon": "IM"
     },
     {
       "id": "navidrome",
       "name": "Navidrome",
-      "url": "http://100.115.135.121:4533/",
+      "url": "https://navidrome.rastapi.fr/",
       "icon": "NV"
     },
     {
       "id": "jellyfin",
       "name": "Jellyfin",
-      "url": "http://100.115.135.121:8096/",
+      "url": "https://jellyfin.rastapi.fr/",
       "healthcheck_path": "/System/Info/Public",
       "icon": "JF"
     }
@@ -52,6 +52,9 @@
     "stalag13": "/var/log/nginx/stalag13.access.log",
     "control-tower": "/var/log/nginx/control.access.log",
     "terje": "/var/log/nginx/terje.access.log",
-    "quiquigagne": "/var/log/nginx/quiquigagne.access.log"
+    "quiquigagne": "/var/log/nginx/quiquigagne.access.log",
+    "immich": "/var/log/nginx/immich.access.log",
+    "jellyfin": "/var/log/nginx/jellyfin.access.log",
+    "navidrome": "/var/log/nginx/navidrome.access.log"
   }
 }

@@ -121,6 +121,8 @@ Reverse proxy HTTPS sur le Pi. Configs dans `/etc/nginx/sites-available/` :
 
 > **Templates download-center** : les 6 vhosts download/jellyseerr/radarr/sonarr/prowlarr/qbittorrent sont generes depuis le repo `~/perso/download-center/` (templates nginx parametres + script de generation). Source de verite des templates : `/home/franck/perso/download-center/nginx/`.
 
+> **NAT loopback Pi (`/etc/hosts`)** : la Livebox d'Ivry ne supporte pas le NAT loopback. Le `/etc/hosts` du Pi force les 13 sous-domaines vers `127.0.0.1` pour que le checker Sites (qui tape l'URL publique) ne timeout pas en boucle. **Pour chaque nouveau site ajoute, etendre cette ligne sur le Pi** sinon le site reste en `timeout` dans le dashboard.
+
 ### HTTPS / Let's Encrypt
 
 - Certificats Let's Encrypt :

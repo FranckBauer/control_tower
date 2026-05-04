@@ -1062,8 +1062,8 @@
     var html = '<div class="site-card ' + statusClass + expanded + '" data-site-id="' + s.id + '">';
     html += '<div class="site-card-head">';
     html += '<div class="site-card-title">';
-    var iconTitle = s.description ? ' title="' + escapeHtml(s.description) + '"' : '';
-    html += '<span class="site-icon"' + iconTitle + '>' + escapeHtml(s.icon || "") + '</span>';
+    var iconTip = s.description ? ' data-tooltip="' + escapeHtml(s.description) + '"' : '';
+    html += '<span class="site-icon"' + iconTip + '>' + escapeHtml(s.icon || "") + '</span>';
     html += '<div class="site-card-name">';
     html += '<strong>' + escapeHtml(s.name) + '</strong>';
     html += '<span class="site-url">' + escapeHtml(s.url) + '</span>';

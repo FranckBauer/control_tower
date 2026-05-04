@@ -44,6 +44,46 @@
       "url": "https://jellyfin.rastapi.fr/",
       "healthcheck_path": "/System/Info/Public",
       "icon": "JF"
+    },
+    {
+      "id": "download",
+      "name": "Download Center",
+      "url": "https://download.rastapi.fr/",
+      "icon": "DL"
+    },
+    {
+      "id": "jellyseerr",
+      "name": "Jellyseerr",
+      "url": "https://jellyseerr.rastapi.fr/",
+      "healthcheck_path": "/api/v1/status",
+      "icon": "JS"
+    },
+    {
+      "id": "radarr",
+      "name": "Radarr",
+      "url": "https://radarr.rastapi.fr/",
+      "healthcheck_path": "/ping",
+      "icon": "RA"
+    },
+    {
+      "id": "sonarr",
+      "name": "Sonarr",
+      "url": "https://sonarr.rastapi.fr/",
+      "healthcheck_path": "/ping",
+      "icon": "SO"
+    },
+    {
+      "id": "prowlarr",
+      "name": "Prowlarr",
+      "url": "https://prowlarr.rastapi.fr/",
+      "healthcheck_path": "/ping",
+      "icon": "PR"
+    },
+    {
+      "id": "qbittorrent",
+      "name": "qBittorrent",
+      "url": "https://qbittorrent.rastapi.fr/",
+      "icon": "QB"
     }
   ],
   "check_interval_seconds": 60,
@@ -55,6 +95,12 @@
     "quiquigagne": "/var/log/nginx/quiquigagne.access.log",
     "immich": "/var/log/nginx/immich.access.log",
     "jellyfin": "/var/log/nginx/jellyfin.access.log",
-    "navidrome": "/var/log/nginx/navidrome.access.log"
+    "navidrome": "/var/log/nginx/navidrome.access.log",
+    "download": "/var/log/nginx/download.access.log",
+    "jellyseerr": "/var/log/nginx/jellyseerr.access.log",
+    "radarr": "/var/log/nginx/radarr.access.log",
+    "sonarr": "/var/log/nginx/sonarr.access.log",
+    "prowlarr": "/var/log/nginx/prowlarr.access.log",
+    "qbittorrent": "/var/log/nginx/qbittorrent.access.log"
   }
 }

@@ -65,6 +65,12 @@ Dashboard d'administration reseau multi-machines. Monitore et gere un PC Windows
 | https://immich.rastapi.fr | Immich (photos) | Pi → Formule1 :2283 | reverse proxy | Tailscale + LAN only | Let's Encrypt |
 | https://jellyfin.rastapi.fr | Jellyfin (films/series) | Pi → Formule1 :8096 | reverse proxy | Tailscale + LAN only | Let's Encrypt |
 | https://navidrome.rastapi.fr | Navidrome (musique) | Pi → Formule1 :4533 | reverse proxy | Tailscale + LAN only | Let's Encrypt |
+| https://download.rastapi.fr | Download Center (Homepage) | Pi → Formule1 :3030 | reverse proxy | Tailscale + LAN only | Let's Encrypt (combine `download-center`) |
+| https://jellyseerr.rastapi.fr | Jellyseerr | Pi → Formule1 :5055 | reverse proxy | Tailscale + LAN only | Let's Encrypt (combine `download-center`) |
+| https://radarr.rastapi.fr | Radarr | Pi → Formule1 :7878 | reverse proxy | Tailscale + LAN only | Let's Encrypt (combine `download-center`) |
+| https://sonarr.rastapi.fr | Sonarr | Pi → Formule1 :8989 | reverse proxy | Tailscale + LAN only | Let's Encrypt (combine `download-center`) |
+| https://prowlarr.rastapi.fr | Prowlarr | Pi → Formule1 :9696 | reverse proxy | Tailscale + LAN only | Let's Encrypt (combine `download-center`) |
+| https://qbittorrent.rastapi.fr | qBittorrent | Pi → Formule1 :8080 | reverse proxy | Tailscale + LAN only | Let's Encrypt (combine `download-center`) |
 
 ### Domaine
 
@@ -75,12 +81,18 @@ Dashboard d'administration reseau multi-machines. Monitore et gere un PC Windows
 ### DNS OVH (Zone DNS)
 
 ```
-control    A   86.246.253.121
-stalag13   A   86.246.253.121
-terje      A   86.246.253.121
-immich     A   86.246.253.121
-jellyfin   A   86.246.253.121
-navidrome  A   86.246.253.121
+control      A   86.246.253.121
+stalag13     A   86.246.253.121
+terje        A   86.246.253.121
+immich       A   86.246.253.121
+jellyfin     A   86.246.253.121
+navidrome    A   86.246.253.121
+download     A   86.246.253.121
+jellyseerr   A   86.246.253.121
+radarr       A   86.246.253.121
+sonarr       A   86.246.253.121
+prowlarr     A   86.246.253.121
+qbittorrent  A   86.246.253.121
 ```
 
 ---
@@ -98,8 +110,16 @@ Reverse proxy HTTPS sur le Pi. Configs dans `/etc/nginx/sites-available/` :
 - **immich.rastapi.fr** : proxy vers `http://100.115.135.121:2283` (Formule1 via Tailscale, `client_max_body_size 50000M`, websockets, no buffering)
 - **jellyfin.rastapi.fr** : proxy vers `http://100.115.135.121:8096` (Formule1 via Tailscale, websockets, no buffering, timeouts 600s)
 - **navidrome.rastapi.fr** : proxy vers `http://100.115.135.121:4533` (Formule1 via Tailscale)
+- **download.rastapi.fr** : proxy vers `http://100.115.135.121:3030` (Formule1 WSL Docker, Homepage)
+- **jellyseerr.rastapi.fr** : proxy vers `http://100.115.135.121:5055` (Formule1 WSL Docker, Jellyseerr)
+- **radarr.rastapi.fr** : proxy vers `http://100.115.135.121:7878` (Formule1 WSL Docker, Radarr)
+- **sonarr.rastapi.fr** : proxy vers `http://100.115.135.121:8989` (Formule1 WSL Docker, Sonarr)
+- **prowlarr.rastapi.fr** : proxy vers `http://100.115.135.121:9696` (Formule1 WSL Docker, Prowlarr)
+- **qbittorrent.rastapi.fr** : proxy vers `http://100.115.135.121:8080` (Formule1 WSL Docker, qBittorrent)
 
-> Les 3 vhosts media (immich/jellyfin/navidrome) restreignent l'acces a `100.64.0.0/10` (Tailscale) + `192.168.1.0/24` (LAN Ivry) + `127.0.0.1`. Pas d'exposition internet publique malgre le DNS A public — l'URL HTTPS est juste un confort de nommage. Hors LAN/Tailscale, les requetes recoivent un `403 Forbidden` du nginx.
+> Les 9 vhosts media+download (immich/jellyfin/navidrome + download/jellyseerr/radarr/sonarr/prowlarr/qbittorrent) restreignent l'acces a `100.64.0.0/10` (Tailscale) + `192.168.1.0/24` (LAN Ivry) + `127.0.0.1`. Pas d'exposition internet publique malgre le DNS A public — l'URL HTTPS est juste un confort de nommage. Hors LAN/Tailscale, les requetes recoivent un `403 Forbidden` du nginx.
+
+> **Templates download-center** : les 6 vhosts download/jellyseerr/radarr/sonarr/prowlarr/qbittorrent sont generes depuis le repo `~/perso/download-center/` (templates nginx parametres + script de generation). Source de verite des templates : `/home/franck/perso/download-center/nginx/`.
 
 ### HTTPS / Let's Encrypt
 
@@ -110,6 +130,7 @@ Reverse proxy HTTPS sur le Pi. Configs dans `/etc/nginx/sites-available/` :
   - `immich.rastapi.fr` (expire 2026-08-01)
   - `jellyfin.rastapi.fr` (expire 2026-08-01)
   - `navidrome.rastapi.fr` (expire 2026-08-01)
+  - `download-center` (combine : download + jellyseerr + radarr + sonarr + prowlarr + qbittorrent .rastapi.fr)
 - Renouvellement automatique via certbot (timer systemd)
 
 ### Services systemd
@@ -168,6 +189,7 @@ La Livebox d'Ivry ne supporte pas le NAT loopback. Pour acceder aux sites depuis
 ```
 # C:\Windows\System32\drivers\etc\hosts
 192.168.1.16  control.rastapi.fr  stalag13.rastapi.fr  terje.rastapi.fr  immich.rastapi.fr  jellyfin.rastapi.fr  navidrome.rastapi.fr
+192.168.1.16  download.rastapi.fr  jellyseerr.rastapi.fr  radarr.rastapi.fr  sonarr.rastapi.fr  prowlarr.rastapi.fr  qbittorrent.rastapi.fr
 ```
 
 Script de fix : `C:\Users\franc\fix-hosts.ps1`

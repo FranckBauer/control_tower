@@ -365,6 +365,8 @@ async def list_sites():
             "url": site["url"],
             "check_url": _build_check_url(site),
             "icon": site.get("icon", ""),
+            "category": site.get("category", "other"),
+            "description": site.get("description", ""),
             "status": cur["status"] if cur else "unknown",
             "code": cur["code"] if cur else None,
             "code_text": cur["code_text"] if cur else None,

@@ -965,6 +965,15 @@
   let sitesData = [];
   let sitesExpandedId = null;
 
+  // Categories de sites : ordre d'affichage + libelle + emoji
+  const SITE_CATEGORIES = [
+    { id: "admin",    label: "Admin",    icon: "🛠" },
+    { id: "dayz",     label: "DayZ",     icon: "🎮" },
+    { id: "media",    label: "Media",    icon: "🎬" },
+    { id: "download", label: "Download", icon: "⬇" },
+    { id: "other",    label: "Autres",   icon: "📦" },
+  ];
+
   async function loadSites() {
     var content = $("#sites-content");
     var badge = $("#sites-count");
@@ -993,11 +1002,33 @@
       content.innerHTML = '<div class="select-machine-msg">No sites configured.</div>';
       return;
     }
-    var html = '<div class="sites-grid">';
+
+    // Groupe par categorie en respectant l'ordre de SITE_CATEGORIES
+    var byCategory = {};
     sitesData.forEach(function (s) {
-      html += buildSiteCard(s);
+      var cat = s.category || "other";
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(s);
     });
-    html += '</div>';
+
+    var html = "";
+    SITE_CATEGORIES.forEach(function (cat) {
+      var sites = byCategory[cat.id];
+      if (!sites || !sites.length) return;
+      var upCount = sites.filter(function (s) { return s.status === "up"; }).length;
+      var allUp = upCount === sites.length;
+      var pillClass = allUp ? "site-up" : "site-down";
+      html += '<div class="sites-category">';
+      html += '<div class="sites-category-header">';
+      html += '<h3 class="sites-category-title"><span class="sites-category-icon">' + cat.icon + '</span>' + escapeHtml(cat.label) + '</h3>';
+      html += '<span class="sites-category-count site-status-pill ' + pillClass + '">' + upCount + '/' + sites.length + ' UP</span>';
+      html += '</div>';
+      html += '<div class="sites-grid">';
+      sites.forEach(function (s) { html += buildSiteCard(s); });
+      html += '</div>';
+      html += '</div>';
+    });
+
     if (sitesExpandedId) {
       html += '<div id="site-detail-container"></div>';
     }
@@ -1031,7 +1062,8 @@
     var html = '<div class="site-card ' + statusClass + expanded + '" data-site-id="' + s.id + '">';
     html += '<div class="site-card-head">';
     html += '<div class="site-card-title">';
-    html += '<span class="site-icon">' + escapeHtml(s.icon || "") + '</span>';
+    var iconTitle = s.description ? ' title="' + escapeHtml(s.description) + '"' : '';
+    html += '<span class="site-icon"' + iconTitle + '>' + escapeHtml(s.icon || "") + '</span>';
     html += '<div class="site-card-name">';
     html += '<strong>' + escapeHtml(s.name) + '</strong>';
     html += '<span class="site-url">' + escapeHtml(s.url) + '</span>';

@@ -1,89 +1,115 @@
 {
   "sites": [
     {
-      "id": "stalag13",
-      "name": "Stalag 13",
-      "url": "https://stalag13.rastapi.fr/",
-      "icon": "S13"
-    },
-    {
       "id": "control-tower",
       "name": "Control Tower",
       "url": "https://control.rastapi.fr/",
       "healthcheck_path": "/health",
-      "icon": "CT"
+      "icon": "CT",
+      "category": "admin",
+      "description": "Ce dashboard : monitoring et admin des machines de l'infra (Pi, Formule1, Beast)."
     },
     {
-      "id": "terje",
-      "name": "Terje",
-      "url": "https://terje.rastapi.fr/",
-      "icon": "TJ"
+      "id": "download",
+      "name": "Download Center",
+      "url": "https://download.rastapi.fr/",
+      "icon": "DL",
+      "category": "admin",
+      "description": "Page d'accueil Homepage qui regroupe et lance les services de la stack download."
     },
     {
       "id": "quiquigagne",
       "name": "Qui Qui Gagne",
       "url": "https://quiquigagne.online/",
-      "icon": "QQ"
+      "icon": "QQ",
+      "category": "admin",
+      "description": "App Flask pour suivre les scores et paris entre amis."
     },
     {
-      "id": "immich",
-      "name": "Immich",
-      "url": "https://immich.rastapi.fr/",
-      "healthcheck_path": "/api/server/version",
-      "icon": "IM"
+      "id": "stalag13",
+      "name": "Stalag 13",
+      "url": "https://stalag13.rastapi.fr/",
+      "icon": "S13",
+      "category": "dayz",
+      "description": "Guide collaboratif des mods DayZ pour le serveur Stalag 13."
     },
     {
-      "id": "navidrome",
-      "name": "Navidrome",
-      "url": "https://navidrome.rastapi.fr/",
-      "icon": "NV"
+      "id": "terje",
+      "name": "Terje",
+      "url": "https://terje.rastapi.fr/",
+      "icon": "TJ",
+      "category": "dayz",
+      "description": "Guide medical DayZ : blessures, maladies, soins."
     },
     {
       "id": "jellyfin",
       "name": "Jellyfin",
       "url": "https://jellyfin.rastapi.fr/",
       "healthcheck_path": "/System/Info/Public",
-      "icon": "JF"
+      "icon": "JF",
+      "category": "media",
+      "description": "Streamer video self-hosted (films + series)."
     },
     {
-      "id": "download",
-      "name": "Download Center",
-      "url": "https://download.rastapi.fr/",
-      "icon": "DL"
+      "id": "immich",
+      "name": "Immich",
+      "url": "https://immich.rastapi.fr/",
+      "healthcheck_path": "/api/server/version",
+      "icon": "IM",
+      "category": "media",
+      "description": "Photothèque self-hosted : sauvegarde et galerie photos."
+    },
+    {
+      "id": "navidrome",
+      "name": "Navidrome",
+      "url": "https://navidrome.rastapi.fr/",
+      "icon": "NV",
+      "category": "media",
+      "description": "Streamer audio self-hosted (musique perso)."
     },
     {
       "id": "jellyseerr",
       "name": "Jellyseerr",
       "url": "https://jellyseerr.rastapi.fr/",
       "healthcheck_path": "/api/v1/status",
-      "icon": "JS"
+      "icon": "JS",
+      "category": "download",
+      "description": "Interface de demandes (films/series) qui pilote automatiquement Radarr et Sonarr."
     },
     {
       "id": "radarr",
       "name": "Radarr",
       "url": "https://radarr.rastapi.fr/",
       "healthcheck_path": "/ping",
-      "icon": "RA"
+      "icon": "RA",
+      "category": "download",
+      "description": "Gestionnaire automatise de telechargement de films."
     },
     {
       "id": "sonarr",
       "name": "Sonarr",
       "url": "https://sonarr.rastapi.fr/",
       "healthcheck_path": "/ping",
-      "icon": "SO"
+      "icon": "SO",
+      "category": "download",
+      "description": "Gestionnaire automatise de telechargement de series."
     },
     {
       "id": "prowlarr",
       "name": "Prowlarr",
       "url": "https://prowlarr.rastapi.fr/",
       "healthcheck_path": "/ping",
-      "icon": "PR"
+      "icon": "PR",
+      "category": "download",
+      "description": "Indexer central qui agrege les sources pour Radarr et Sonarr."
     },
     {
       "id": "qbittorrent",
       "name": "qBittorrent",
       "url": "https://qbittorrent.rastapi.fr/",
-      "icon": "QB"
+      "icon": "QB",
+      "category": "download",
+      "description": "Client BitTorrent : le telechargeur effectif."
     }
   ],
   "check_interval_seconds": 60,

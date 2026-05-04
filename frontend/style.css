@@ -1409,6 +1409,43 @@ tr:hover td { background: rgba(255,255,255,0.015); }
 }
 
 /* --- Sites monitoring --- */
+.sites-category {
+  margin-bottom: 24px;
+}
+.sites-category:last-of-type {
+  margin-bottom: 0;
+}
+.sites-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.sites-category-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+.sites-category-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.sites-category-count {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+.site-icon[title] { cursor: help; }
+
 .sites-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));

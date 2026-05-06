@@ -2621,22 +2621,21 @@
       liaisonHtml = '<span class="device-liaison-none">—</span>';
     }
 
-    // Trafic
-    var traficHtml = "";
+    // Trafic : "—" pour Self ou aucun octet, sinon Tx/Rx formates
+    var traficHtml = "—";
     if (!d.is_self && (d.tx_bytes || d.rx_bytes)) {
       traficHtml = "↑ " + formatBytes(d.tx_bytes) + " · ↓ " + formatBytes(d.rx_bytes);
-    } else if (d.is_self) {
-      traficHtml = "—";
-    } else {
-      traficHtml = "0 B";
     }
 
-    // Last handshake (uniquement si pertinent)
+    // Handshake : seulement si online ET recent (< 24h) — sinon trompeur
+    // (Tailscale arrete de re-handshake apres inactivite, le timestamp peut dater
+    //  de plusieurs jours sur un peer pourtant online via le coordination server)
     var handshakeHtml = "";
-    if (!d.is_self && d.last_handshake && !d.last_handshake.startsWith("0001")) {
-      handshakeHtml = relativeTime(d.last_handshake);
-    } else if (d.is_self) {
-      handshakeHtml = "—";
+    if (!d.is_self && d.online && d.last_handshake && !d.last_handshake.startsWith("0001")) {
+      var hsAgeH = (Date.now() - new Date(d.last_handshake).getTime()) / 3600000;
+      if (hsAgeH < 24) {
+        handshakeHtml = relativeTime(d.last_handshake);
+      }
     }
 
     var html = "";

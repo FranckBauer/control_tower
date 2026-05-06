@@ -207,9 +207,9 @@
       l.classList.toggle("active", l.dataset.section === name);
     });
 
-    // Sites monitore des URLs externes : la barre de selection machine est inutile
+    // Sites et Tailnet sont independants des machines : la barre de selection est masquee
     var bar = $("#machine-selector");
-    if (bar) bar.style.display = (name === "sites") ? "none" : "";
+    if (bar) bar.style.display = (name === "sites" || name === "tailnet") ? "none" : "";
 
     loadSection(name);
   }
@@ -222,6 +222,7 @@
       case "monitoring": loadMonitoring(); break;
       case "history": loadHistory(); break;
       case "sites": loadSites(); break;
+      case "tailnet": loadTailnet(); break;
       case "services": loadServices(); break;
       case "network": loadNetwork(); break;
       case "files": loadFiles(); break;
@@ -2539,6 +2540,181 @@
       toast("Failed to load machines: " + err.message, "error");
     }
     renderMachineSelector();
+  }
+
+  /* ---------------------------------------------------------------
+     Tailnet (vue de tous les noeuds Tailscale)
+     --------------------------------------------------------------- */
+  var tailnetData = null;
+
+  function osIcon(os) {
+    switch ((os || "").toLowerCase()) {
+      case "windows": return "🪟";
+      case "linux": return "🐧";
+      case "android": return "🤖";
+      case "macos":
+      case "ios":
+      case "iphone":
+      case "ipad": return "🍎";
+      case "freebsd":
+      case "openbsd": return "😈";
+      default: return "💻";
+    }
+  }
+
+  function osLabel(os) {
+    var map = { windows: "Windows", linux: "Linux", android: "Android", macos: "macOS", ios: "iOS" };
+    return map[(os || "").toLowerCase()] || (os ? os.charAt(0).toUpperCase() + os.slice(1) : "Inconnu");
+  }
+
+  function formatBytes(n) {
+    if (!n || n < 0) return "0 B";
+    var units = ["B", "KB", "MB", "GB", "TB"];
+    var i = 0;
+    var v = n;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return (i === 0 ? v.toFixed(0) : v.toFixed(v < 10 ? 2 : 1)) + " " + units[i];
+  }
+
+  function relativeTime(iso) {
+    if (!iso) return "";
+    var t;
+    try { t = new Date(iso).getTime(); } catch (e) { return ""; }
+    if (!t || isNaN(t)) return "";
+    var diff = Math.floor((Date.now() - t) / 1000);
+    if (diff < 0) diff = 0;
+    if (diff < 10) return "à l'instant";
+    if (diff < 60) return "il y a " + diff + "s";
+    if (diff < 3600) return "il y a " + Math.floor(diff / 60) + " min";
+    if (diff < 86400) return "il y a " + Math.floor(diff / 3600) + " h";
+    if (diff < 86400 * 30) return "il y a " + Math.floor(diff / 86400) + " j";
+    if (diff < 86400 * 365) return "il y a " + Math.floor(diff / (86400 * 30)) + " mois";
+    return "il y a " + Math.floor(diff / (86400 * 365)) + " an" + (diff >= 86400 * 730 ? "s" : "");
+  }
+
+  function buildDeviceCard(d) {
+    var statusClass = d.online ? "device-online" : "device-offline";
+    var statusText = d.online ? "Online" : "Offline";
+    var statusDetail = "";
+    if (!d.online && d.last_seen) {
+      statusDetail = '<span class="device-last-seen">vu ' + relativeTime(d.last_seen) + "</span>";
+    }
+
+    var badges = "";
+    if (d.is_self) badges += '<span class="device-badge device-badge-self">Soi</span>';
+    if (d.exit_node) badges += '<span class="device-badge device-badge-exit-active">Exit Node actif</span>';
+    else if (d.exit_node_option) badges += '<span class="device-badge device-badge-exit">Exit Node dispo</span>';
+    (d.tags || []).forEach(function (tag) {
+      badges += '<span class="device-badge device-badge-tag">' + escapeHtml(tag) + "</span>";
+    });
+
+    // Liaison : Direct si has_direct, sinon DERP
+    var liaisonHtml = "";
+    if (d.is_self) {
+      liaisonHtml = '<span class="device-liaison-this">cette machine</span>';
+    } else if (d.online && d.has_direct) {
+      liaisonHtml = '<span class="device-liaison-direct">⚡ Direct</span>';
+      if (d.cur_addr) liaisonHtml += ' <span class="device-liaison-addr">' + escapeHtml(d.cur_addr) + "</span>";
+    } else if (d.online && d.relay) {
+      liaisonHtml = '<span class="device-liaison-relay">↪ DERP ' + escapeHtml(d.relay_label || d.relay) + "</span>";
+    } else {
+      liaisonHtml = '<span class="device-liaison-none">—</span>';
+    }
+
+    // Trafic
+    var traficHtml = "";
+    if (!d.is_self && (d.tx_bytes || d.rx_bytes)) {
+      traficHtml = "↑ " + formatBytes(d.tx_bytes) + " · ↓ " + formatBytes(d.rx_bytes);
+    } else if (d.is_self) {
+      traficHtml = "—";
+    } else {
+      traficHtml = "0 B";
+    }
+
+    // Last handshake (uniquement si pertinent)
+    var handshakeHtml = "";
+    if (!d.is_self && d.last_handshake && !d.last_handshake.startsWith("0001")) {
+      handshakeHtml = relativeTime(d.last_handshake);
+    } else if (d.is_self) {
+      handshakeHtml = "—";
+    }
+
+    var html = "";
+    html += '<div class="device-card ' + statusClass + '" data-device-id="' + escapeHtml(d.id) + '">';
+    html += '  <div class="device-card-header">';
+    html += '    <span class="device-os-icon" title="' + osLabel(d.os) + '">' + osIcon(d.os) + "</span>";
+    html += '    <div class="device-name-block">';
+    html += '      <div class="device-name">' + escapeHtml(d.host_name || "—") + "</div>";
+    html += '      <div class="device-dns" title="' + escapeHtml(d.dns_name || "") + '">' + escapeHtml(d.dns_name || "") + "</div>";
+    html += "    </div>";
+    if (badges) html += '    <div class="device-badges">' + badges + "</div>";
+    html += "  </div>";
+
+    html += '  <div class="device-status-row">';
+    html += '    <span class="device-status-pill ' + statusClass + '"><span class="device-status-dot"></span>' + statusText + "</span>";
+    if (statusDetail) html += "    " + statusDetail;
+    html += "  </div>";
+
+    html += '  <div class="device-info-grid">';
+    html += '    <div class="device-info-row"><span class="device-info-label">IP</span><span class="device-info-value device-mono">' + escapeHtml(d.ip_v4 || "—") + "</span></div>";
+    if (d.ip_v6) {
+      html += '    <div class="device-info-row"><span class="device-info-label">v6</span><span class="device-info-value device-mono device-truncate" title="' + escapeHtml(d.ip_v6) + '">' + escapeHtml(d.ip_v6) + "</span></div>";
+    }
+    html += '    <div class="device-info-row"><span class="device-info-label">OS</span><span class="device-info-value">' + osLabel(d.os) + "</span></div>";
+    html += '    <div class="device-info-row"><span class="device-info-label">Liaison</span><span class="device-info-value">' + liaisonHtml + "</span></div>";
+    html += '    <div class="device-info-row"><span class="device-info-label">Trafic</span><span class="device-info-value device-mono">' + traficHtml + "</span></div>";
+    if (handshakeHtml) {
+      html += '    <div class="device-info-row"><span class="device-info-label">Handshake</span><span class="device-info-value">' + handshakeHtml + "</span></div>";
+    }
+    if (d.created) {
+      html += '    <div class="device-info-row"><span class="device-info-label">Ajouté</span><span class="device-info-value">' + relativeTime(d.created) + "</span></div>";
+    }
+    html += "  </div>";
+    html += "</div>";
+    return html;
+  }
+
+  function renderTailnet(content, payload) {
+    var devices = (payload && payload.devices) || [];
+    var badge = $("#tailnet-count");
+    var suffix = $("#tailnet-suffix");
+
+    if (badge) {
+      var onlineCount = devices.filter(function (d) { return d.online; }).length;
+      badge.textContent = onlineCount + " / " + devices.length + " online";
+    }
+    if (suffix) {
+      suffix.textContent = payload && payload.magic_dns_suffix ? payload.magic_dns_suffix : "";
+    }
+
+    if (!devices.length) {
+      content.innerHTML = '<div class="select-machine-msg">Aucun appareil dans le tailnet.</div>';
+      return;
+    }
+
+    var html = '<div class="devices-grid">';
+    devices.forEach(function (d) { html += buildDeviceCard(d); });
+    html += "</div>";
+    content.innerHTML = html;
+  }
+
+  async function loadTailnet() {
+    var content = $("#tailnet-content");
+    try {
+      var resp = await api("/api/tailscale/devices");
+      tailnetData = resp;
+      renderTailnet(content, resp);
+    } catch (err) {
+      content.innerHTML = '<div class="loading-indicator">Echec du chargement du tailnet : ' + escapeHtml(err.message) + "</div>";
+    }
+
+    refreshTimer = setInterval(function () {
+      if (currentSection !== "tailnet") return;
+      api("/api/tailscale/devices").then(function (resp) {
+        tailnetData = resp;
+        renderTailnet($("#tailnet-content"), resp);
+      }).catch(function () {});
+    }, 30000);
   }
 
   async function init() {

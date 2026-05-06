@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.9 - 2026-05-06
+### Vue Tailnet — liste de tous les noeuds Tailscale
+
+- Nouvelle section **Tailnet** dans la sidebar (entre Sites et Services).
+- Backend `dashboard/tailscale.py` : endpoint `GET /api/tailscale/devices` qui invoque
+  `tailscale status --json` localement (binaire detecte automatiquement Linux ou
+  Windows via WSL) et expose Self + Peers normalises. Cache 15s pour ne pas spammer
+  le demon Tailscale.
+- Frontend : grille de cards responsives, une card par appareil, avec :
+  - Icone OS (Windows/Linux/Android/macOS), nom, FQDN MagicDNS
+  - Badge "Soi" pour la machine locale, "Exit Node actif/dispo" si applicable
+  - Pill Online/Offline avec dot pulsant (vert) ou last_seen relatif (rouge)
+  - IP v4 + v6, OS, type de liaison (Direct + adresse, ou DERP + ville)
+  - Trafic Tx/Rx formate, dernier handshake, date d'ajout au tailnet
+- Auto-refresh 30s. Header affiche le suffixe MagicDNS (ex: `tailbb26eb.ts.net`).
+- Tri : Soi > online > offline, puis par nom alphabetique.
+- Permet enfin d'avoir une visibilite sur les noeuds sans agent control_tower
+  (Android, iPad...) — un Pi avec son agent reste vu via Monitoring, mais un S20
+  ou une Tab A9+ apparaissent ici avec leur etat reel du tailnet.
+
 ## v4.7 - 2026-05-04
 ### Sous-domaines HTTPS pour immich/jellyfin/navidrome (reverse proxy Pi)
 

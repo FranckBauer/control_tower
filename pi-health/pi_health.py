@@ -6,7 +6,7 @@ Tourne via systemd timer toutes les minutes. Pour chaque check :
   2. Log structuré en JSON dans /var/log/pi-health/health.log
   3. Détecte les anomalies vs les seuils
   4. Auto-recovery (restart service, ip link cycle)
-  5. Envoie alerte mail (avec anti-spam) si anomalie critique
+  5. Envoie alerte push via ntfy.sh (avec anti-spam) si anomalie critique
 
 Conçu pour tourner en root (accès vcgencmd, systemctl, ip link, dmesg).
 
@@ -18,13 +18,13 @@ from __future__ import annotations
 import json
 import os
 import re
-import smtplib
 import socket
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
-from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Any
 
@@ -50,14 +50,12 @@ MEM_AVAIL_WARN_MB = 200
 # Anti-spam : ne pas re-alerter sur la même condition avant N secondes
 ALERT_RENOTIFY_SECONDS = 1800  # 30 min
 
-# Mail
-SMTP_HOST = "10.10.0.61"
-SMTP_PORT = 25
-SMTP_TIMEOUT = 10
-MAIL_FROM = "fbauer@yacast.fr"
-MAIL_TO = "aaaaafe63k2shrr2w6wuw3hk2i@yacast.slack.com"
-RELAY_HOST = "10.2.10.173"  # fallback SSH si SMTP direct échoue
-RELAY_USER = "fbauer"
+# Notification push via ntfy.sh
+# Le topic secret est lu depuis NTFY_TOPIC_FILE (mode 600 root, pas en git).
+# Pour souscrire depuis l'app ntfy : entrer l'URL https://ntfy.sh/<topic>
+NTFY_BASE_URL = "https://ntfy.sh"
+NTFY_TOPIC_FILE = Path("/etc/pi-health/ntfy-topic")
+NTFY_TIMEOUT = 10
 
 # Services systemd à surveiller (critical = mail si down)
 CRITICAL_SERVICES = ["nginx", "dnsmasq", "tailscaled"]
@@ -340,36 +338,62 @@ def reset_err_counter(state: dict, key: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Mail
+# Notification (ntfy.sh)
 # ---------------------------------------------------------------------------
 
-def send_mail(subject: str, body: str) -> bool:
-    """SMTP direct, fallback SSH relay si Yacast pas joignable."""
-    msg = MIMEText(body)
-    msg["From"] = MAIL_FROM
-    msg["To"] = MAIL_TO
-    msg["Subject"] = subject
+# Mapping niveau pi-health → priorité ntfy
+_NTFY_PRIORITY = {
+    "warning": "high",
+    "critical": "urgent",
+    "ok": "low",
+}
+
+
+def _read_ntfy_topic() -> str | None:
+    """Lit le topic secret depuis /etc/pi-health/ntfy-topic. Renvoie None si absent."""
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as s:
-            s.send_message(msg)
-        return True
-    except (OSError, smtplib.SMTPException):
-        pass
-    # Fallback SSH relay
-    body_escaped = body.replace("'", "'\\''")
-    subj_escaped = subject.replace("'", "'\\''")
-    py = (
-        "import smtplib; from email.mime.text import MIMEText; "
-        f"m=MIMEText('''{body_escaped}'''); "
-        f"m['From']='{MAIL_FROM}'; m['To']='{MAIL_TO}'; m['Subject']='''{subj_escaped}'''; "
-        f"smtplib.SMTP('{SMTP_HOST}',{SMTP_PORT},timeout={SMTP_TIMEOUT}).send_message(m)"
+        topic = NTFY_TOPIC_FILE.read_text().strip()
+        return topic or None
+    except OSError:
+        return None
+
+
+def send_ntfy(title: str, body: str, level: str = "default") -> bool:
+    """Envoie une notification push via ntfy.sh sur le topic secret.
+
+    title : ligne courte affichée en gros (= subject de l'ancien mail)
+    body  : corps détaillé (multi-lignes OK)
+    level : 'warning' / 'critical' / 'ok' → priorité ntfy
+    """
+    topic = _read_ntfy_topic()
+    if not topic:
+        return False
+
+    url = f"{NTFY_BASE_URL}/{topic}"
+    priority = _NTFY_PRIORITY.get(level, "default")
+    # Tags : icônes affichées sur la notif ntfy. warning = ⚠️, white_check_mark = ✅
+    tag = "warning" if level in ("warning", "critical") else "white_check_mark"
+
+    headers = {
+        # Title et autres headers ntfy : ASCII safe via encodage RFC 2047 (basique)
+        # Les caractères non-ASCII y deviendraient bizarres → on encode si besoin.
+        "Title": title.encode("ascii", "replace").decode("ascii"),
+        "Priority": priority,
+        "Tags": tag,
+        "Content-Type": "text/plain; charset=utf-8",
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=body.encode("utf-8"),
+        headers=headers,
+        method="POST",
     )
-    rc, _, _ = run(
-        ["ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes",
-         f"{RELAY_USER}@{RELAY_HOST}", f"python3 -c \"{py}\""],
-        timeout=15,
-    )
-    return rc == 0
+    try:
+        with urllib.request.urlopen(req, timeout=NTFY_TIMEOUT) as r:
+            return 200 <= r.status < 300
+    except (urllib.error.URLError, OSError):
+        return False
 
 
 def should_notify(state: dict, key: str, level: str) -> bool:
@@ -432,10 +456,10 @@ def main() -> int:
     notif_keys = set(state.get("notifs", {}).keys())
     for k in notif_keys - active_keys:
         if mark_resolved(state, k):
-            send_mail(
-                f"[pi-health] OK — {k} résolu",
-                f"L'alerte {k} est résolue à {now_iso()}.\n"
-                f"Metrics : {json.dumps(metrics, indent=2)}",
+            send_ntfy(
+                title=f"[pi-health] OK — {k} resolu",
+                body=f"L'alerte {k} est résolue à {now_iso()}.",
+                level="ok",
             )
 
     # Traite chaque anomalie
@@ -450,19 +474,19 @@ def main() -> int:
         with ALERTS_LOG.open("a") as f:
             f.write(json.dumps({"ts": metrics["ts"], **a}, separators=(",", ":")) + "\n")
 
-        # Mail
+        # Notification push
         if should_notify(state, a["key"], a["level"]):
-            subj = f"[pi-health] {a['level'].upper()} — {a['msg'][:80]}"
-            body = (
-                f"Alerte : {a['msg']}\n"
-                f"Niveau : {a['level']}\n"
-                f"Quand  : {metrics['ts']}\n"
-                f"Hôte   : {metrics['hostname']}\n"
-            )
+            title = f"[pi-health] {a['level'].upper()} — {a['msg'][:100]}"
+            body_lines = [
+                f"Alerte : {a['msg']}",
+                f"Niveau : {a['level']}",
+                f"Quand  : {metrics['ts']}",
+                f"Hote   : {metrics['hostname']}",
+            ]
             if a.get("recovery"):
-                body += f"Recovery : {a['recovery']} (ok={a.get('recovery_ok')})\n"
-            body += f"\nMetrics complètes :\n{json.dumps(metrics, indent=2)}\n"
-            send_mail(subj, body)
+                body_lines.append(f"Recovery : {a['recovery']} (ok={a.get('recovery_ok')})")
+            body = "\n".join(body_lines)
+            send_ntfy(title=title, body=body, level=a["level"])
 
     save_state(state)
     return 0

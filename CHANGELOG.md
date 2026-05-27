@@ -1,5 +1,38 @@
 # Changelog
 
+## v4.11 - 2026-05-27
+### pi-health : canal de notification basculé de mail SMTP vers ntfy.sh
+
+Le canal mail v4.10 ne fonctionnait pas en pratique :
+- SMTP Yacast `10.10.0.61:25` rejette les IP VPN `10.0.8.x` (rejet `cannot find your
+  reverse hostname`). Le Pi est sur 10.0.8.x via OpenVPN Yacast → rejeté.
+- Le fallback SSH relay vers `fbauer@10.2.10.173` (réutilisé du `notify.sh`
+  sync-claude-memory) échoue depuis le Pi : sa clé `fbauer_ed25519` n'est pas
+  autorisée sur cet host (alors qu'elle l'est pour Formule1).
+- Même fixé, ça mélangerait infra Yacast (boulot) avec monitoring perso (règle
+  feedbacks #10 = pas de mix boulot/perso).
+
+Remplacé par **ntfy.sh** :
+- Service push notification gratuit, sans inscription
+- Le Pi POST sur `https://ntfy.sh/<topic-secret>` → notification instantanée
+  sur le tel de Franck (app ntfy gratuite Android/iOS) et/ou browser
+- Topic secret stocké dans `/etc/pi-health/ntfy-topic` (mode 600 root, jamais
+  en git ni en mémoire — conforme règle feedbacks #9 pas de secrets)
+- Marche depuis n'importe quelle IP avec sortie HTTPS, indépendant de Yacast,
+  pas de dépendance à Formule1
+- Mapping niveaux pi-health → ntfy : ok=low (tag ✓), warning=high, critical=urgent (tag ⚠️)
+
+Code modifié :
+- `pi_health.py` : suppression `send_mail()` + dépendances `smtplib`/MIMEText,
+  ajout `send_ntfy(title, body, level)` qui POST en HTTPS via `urllib.request`
+  (stdlib, pas de dep). Lecture du topic depuis `/etc/pi-health/ntfy-topic`.
+- Notifs de résolution envoyées en priorité `low` avec tag `white_check_mark`.
+
+Pour installer/utiliser : voir `pi-health/README.md`.
+
+Le même topic ntfy peut être réutilisé par d'autres scripts/projets perso pour
+alerter Franck (cf. message inbox déposé dans `/home/franck/perso`).
+
 ## v4.10 - 2026-05-27
 ### pi-health : monitoring + alerting + auto-recovery du Pi rasta-server
 

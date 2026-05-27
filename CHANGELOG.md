@@ -1,5 +1,50 @@
 # Changelog
 
+## v4.10 - 2026-05-27
+### pi-health : monitoring + alerting + auto-recovery du Pi rasta-server
+
+Nouveau module `pi-health/` (script + units systemd + install) à côté de `agent/` et `dashboard/`.
+
+- Script Python `pi_health.py` lancé par timer systemd toutes les minutes (root).
+  Collecte par check :
+  - Température CPU (`/sys/class/thermal/thermal_zone0/temp` + fallback `vcgencmd`)
+  - État link eth0 (operstate, carrier, speed) + nombre de flap Up/Down sur 1 min (parse `dmesg`)
+  - État des services critiques : nginx, dnsmasq, tailscaled
+  - DNS local : `dig @127.0.0.1 jellyfin.rastapi.fr` doit retourner `100.105.88.5`
+  - Charge CPU (load1), RAM dispo, % disque /
+
+- Seuils déclenchant alerte :
+  - Température : warning à 75°C, critical à 85°C (throttling imminent)
+  - Link eth0 : critical si down, warning si ≥4 flap/min
+  - Service systemd non actif : critical
+  - DNS local KO : critical
+  - Disque : warning à 85%, critical à 95%
+  - RAM dispo < 200 MB ou load1 > 4 : warning
+
+- Logs structurés JSON ligne par ligne :
+  - `/var/log/pi-health/health.log` : métriques de chaque check
+  - `/var/log/pi-health/alerts.log` : anomalies détectées
+  - `journalctl -u pi-health.service` : exécution systemd
+
+- Auto-recovery (Phase 2) après 2 checks consécutifs en erreur (~2 min) :
+  - Service down → `systemctl restart <service>`
+  - Link eth0 down → `ip link set eth0 down ; sleep 2 ; ip link set eth0 up`
+
+- Mail d'alerte vers `aaaaafe63k2shrr2w6wuw3hk2i@yacast.slack.com` (canal Slack Franck) :
+  - SMTP direct Yacast `10.10.0.61:25` avec fallback SSH relay `fbauer@10.2.10.173`
+    (Pi via OpenVPN Yacast actif sur `tun0`)
+  - Anti-spam : ré-envoi au max toutes les 30 min tant que l'anomalie persiste
+  - Mail de résolution envoyé quand l'anomalie disparaît
+
+- State persistant dans `/var/lib/pi-health/state.json` (counters d'erreurs consécutives,
+  timestamps des dernières notifs).
+
+Conçu suite aux incidents 2026-05-12 et 2026-05-27 où le Pi est devenu injoignable
+sans aucune alerte, avec heures perdues à diagnostiquer post-mortem. Désormais une
+alerte mail/Slack arrive en quelques minutes en cas de problème critique.
+
+Installation : `cd pi-health && bash install.sh` sur le Pi (sudo).
+
 ## v4.9 - 2026-05-06
 ### Vue Tailnet — liste de tous les noeuds Tailscale
 

@@ -17,6 +17,7 @@ Machine 1              Machine 2              Machine 3
 - **Agent** : FastAPI leger, tourne sur chaque machine (Linux/Windows), expose les API systeme
 - **Dashboard** : FastAPI + proxy, sert le frontend et relaie les requetes vers les agents
 - **Frontend** : HTML/CSS/JS vanilla, theme sombre, interface d'administration complete
+- **pi-health** : module dedie (sur le Pi rasta-server) — monitoring temperature/link/services + auto-recovery + notification push ntfy.sh. Voir [`pi-health/README.md`](pi-health/README.md).
 
 ## Fonctionnalites
 

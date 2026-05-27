@@ -1,0 +1,19 @@
+[Unit]
+Description=Pi Health Monitor — un check des métriques + alerte mail si seuil dépassé
+Documentation=https://github.com/FranckBauer/control_tower/tree/main/pi-health
+After=network-online.target dnsmasq.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/pi-health/pi_health.py
+StandardOutput=journal
+StandardError=journal
+# Run as root pour accès vcgencmd, ip link, systemctl restart, dmesg
+User=root
+# Sécurité minimale
+NoNewPrivileges=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/var/log/pi-health /var/lib/pi-health
+# Pas d'accès réseau au-delà du strict nécessaire — non, on a besoin SMTP + SSH
